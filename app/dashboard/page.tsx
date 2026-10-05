@@ -1,348 +1,368 @@
-"use client";
+'use client';
 
-import { motion } from "framer-motion";
+import { useEffect, useState } from 'react';
+import Link from 'next/link';
+import { motion } from 'framer-motion';
 import {
-  ShoppingCart,
+  ShoppingBag,
   DollarSign,
   Users,
   Clock,
   TrendingUp,
-  TrendingDown,
-  ArrowUpRight,
-} from "lucide-react";
-import {
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-  BarChart,
-  Bar,
-} from "recharts";
+  Package,
+  Grid3x3,
+  ArrowRight,
+} from 'lucide-react';
+import { createClient } from '@/lib/supabase/client';
+import { useRestaurant } from '@/lib/hooks/useRestaurant';
 
-const stats = [
-  { label: "Today's Orders", value: "48", change: "+18.4%", isUp: true, icon: ShoppingCart, color: "red" },
-  { label: "Today's Revenue", value: "$1,240", change: "+24.8%", isUp: true, icon: DollarSign, color: "amber" },
-  { label: "New Customers", value: "12", change: "+8.2%", isUp: true, icon: Users, color: "emerald" },
-  { label: "Cancellation Rate", value: "2.4%", change: "-1.1%", isUp: false, icon: Clock, color: "cyan" },
-];
+const supabase = createClient();
 
-const revenueData = [
-  { day: "Mon", revenue: 420, orders: 18 },
-  { day: "Tue", revenue: 680, orders: 24 },
-  { day: "Wed", revenue: 520, orders: 20 },
-  { day: "Thu", revenue: 840, orders: 32 },
-  { day: "Fri", revenue: 1120, orders: 45 },
-  { day: "Sat", revenue: 1240, orders: 48 },
-  { day: "Sun", revenue: 980, orders: 38 },
-];
-
-const statusData = [
-  { name: "Completed", value: 32, color: "#10B981" },
-  { name: "Pending", value: 8, color: "#F59E0B" },
-  { name: "Preparing", value: 6, color: "#06B6D4" },
-  { name: "Cancelled", value: 2, color: "#EF4444" },
-];
-
-const popularProducts = [
-  { name: "Classic Burger", sales: 142, revenue: "$710" },
-  { name: "Cheese Pizza", sales: 98, revenue: "$1,176" },
-  { name: "Fried Chicken", sales: 87, revenue: "$609" },
-  { name: "Coca Cola", sales: 156, revenue: "$468" },
-  { name: "Chocolate Cake", sales: 64, revenue: "$256" },
-];
-
-const recentOrders = [
-  { id: "#1042", customer: "Ahmad Ali", total: "$19", status: "Pending", time: "2 min ago" },
-  { id: "#1041", customer: "Sarah Smith", total: "$14", status: "Preparing", time: "8 min ago" },
-  { id: "#1040", customer: "Omar Khaled", total: "$24", status: "Completed", time: "25 min ago" },
-  { id: "#1039", customer: "Layla Ahmad", total: "$12", status: "Completed", time: "45 min ago" },
-  { id: "#1038", customer: "Hassan Ali", total: "$32", status: "Completed", time: "1h ago" },
-];
-
-const fadeInUp = {
-  hidden: { opacity: 0, y: 30 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.5 } },
+type Stats = {
+  todayOrders: number;
+  todayRevenue: number;
+  totalCustomers: number;
+  pendingOrders: number;
+  totalProducts: number;
+  totalCategories: number;
+  totalOrders: number;
 };
 
-const stagger = {
-  hidden: { opacity: 0 },
-  visible: { opacity: 1, transition: { staggerChildren: 0.1 } },
-};
+export default function OverviewPage() {
+  const { restaurant, loading: restaurantLoading } = useRestaurant();
+  const [stats, setStats] = useState<Stats>({
+    todayOrders: 0,
+    todayRevenue: 0,
+    totalCustomers: 0,
+    pendingOrders: 0,
+    totalProducts: 0,
+    totalCategories: 0,
+    totalOrders: 0,
+  });
+  const [loading, setLoading] = useState(true);
+  const [recentOrders, setRecentOrders] = useState<any[]>([]);
 
-const colorMap: Record<string, { bg: string; text: string; border: string }> = {
-  red: { bg: "bg-red-600/20", text: "text-red-400", border: "border-red-600/30" },
-  amber: { bg: "bg-amber-500/20", text: "text-amber-400", border: "border-amber-500/30" },
-  emerald: { bg: "bg-emerald-500/20", text: "text-emerald-400", border: "border-emerald-500/30" },
-  cyan: { bg: "bg-cyan-500/20", text: "text-cyan-400", border: "border-cyan-500/30" },
-};
+  useEffect(() => {
+    if (!restaurant?.id) return;
 
-export default function DashboardOverview() {
+    let cancelled = false;
+
+    const fetchStats = async () => {
+      setLoading(true);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const [ordersRes, productsRes, categoriesRes] = await Promise.all([
+        supabase
+          .from('orders')
+          .select('id, total, status, customer_phone, created_at')
+          .eq('restaurant_id', restaurant.id),
+        supabase
+          .from('products')
+          .select('id', { count: 'exact', head: true })
+          .eq('restaurant_id', restaurant.id),
+        supabase
+          .from('categories')
+          .select('id', { count: 'exact', head: true })
+          .eq('restaurant_id', restaurant.id),
+      ]);
+
+      if (cancelled) return;
+
+      const orders = ordersRes.data ?? [];
+      const todayOrders = orders.filter(
+        (o) => new Date(o.created_at) >= today
+      );
+      const todayRevenue = todayOrders
+        .filter((o) => o.status !== 'cancelled')
+        .reduce((s, o) => s + Number(o.total || 0), 0);
+      const uniqueCustomers = new Set(
+        orders.map((o) => o.customer_phone).filter(Boolean)
+      ).size;
+      const pendingOrders = orders.filter(
+        (o) => o.status === 'pending'
+      ).length;
+
+      setStats({
+        todayOrders: todayOrders.length,
+        todayRevenue,
+        totalCustomers: uniqueCustomers,
+        pendingOrders,
+        totalProducts: productsRes.count ?? 0,
+        totalCategories: categoriesRes.count ?? 0,
+        totalOrders: orders.length,
+      });
+
+      setRecentOrders(
+        [...orders]
+          .sort(
+            (a, b) =>
+              new Date(b.created_at).getTime() -
+              new Date(a.created_at).getTime()
+          )
+          .slice(0, 5)
+      );
+
+      setLoading(false);
+    };
+
+    fetchStats();
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [restaurant?.id]);
+
+  if (restaurantLoading || loading) {
+    return (
+      <div className="min-h-screen bg-cream p-8 flex items-center justify-center">
+        <div className="w-8 h-8 rounded-full border-2 border-brand border-t-transparent animate-spin" />
+      </div>
+    );
+  }
+
+  if (!restaurant) {
+    return (
+      <div className="min-h-screen bg-cream p-8 text-center">
+        <p className="text-red-500">No restaurant found</p>
+        <Link
+          href="/dashboard/setup"
+          className="text-brand underline mt-2 inline-block"
+        >
+          Setup your restaurant →
+        </Link>
+      </div>
+    );
+  }
+
   return (
-    <motion.div
-      initial="hidden"
-      animate="visible"
-      variants={stagger}
-      className="space-y-6"
-    >
-      {/* Page Header */}
-      <motion.div variants={fadeInUp} className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold">Overview</h1>
-          <p className="text-sm text-gray-400">Here's your restaurant performance today</p>
+    <div className="min-h-screen bg-cream p-4 md:p-6">
+      {/* Header */}
+      <div className="mb-6">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h1 className="text-2xl md:text-3xl font-bold text-ink">
+              Welcome back 👋
+            </h1>
+            <p className="text-sm text-ink-muted mt-1">
+              Here's what's happening at {restaurant.name}
+            </p>
+          </div>
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-brand/10 border border-brand/20">
+            <span className="w-2 h-2 rounded-full bg-brand" />
+            <span className="text-xs font-medium text-brand uppercase tracking-wider">
+              {restaurant.plan} Plan
+            </span>
+          </div>
         </div>
-        <button className="hidden md:flex items-center gap-2 bg-gradient-to-r from-red-600 to-amber-500 px-5 py-2.5 rounded-xl text-sm font-semibold hover:opacity-90 transition">
-          <ArrowUpRight size={16} />
-          View Reports
-        </button>
+      </div>
+
+      {/* Stats Grid */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-6">
+        <StatCard
+          icon={<ShoppingBag size={20} />}
+          label="Today's Orders"
+          value={stats.todayOrders.toString()}
+          delay={0}
+        />
+        <StatCard
+          icon={<DollarSign size={20} />}
+          label="Today's Revenue"
+          value={`$${stats.todayRevenue.toFixed(2)}`}
+          delay={0.05}
+        />
+        <StatCard
+          icon={<Users size={20} />}
+          label="Customers"
+          value={stats.totalCustomers.toString()}
+          delay={0.1}
+        />
+        <StatCard
+          icon={<Clock size={20} />}
+          label="Pending Orders"
+          value={stats.pendingOrders.toString()}
+          delay={0.15}
+          highlight={stats.pendingOrders > 0}
+        />
+      </div>
+
+      {/* Plan Limits */}
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.2 }}
+        className="bg-surface border border-line rounded-2xl p-5 md:p-6 shadow-soft mb-6"
+      >
+        <div className="flex items-center gap-2 mb-5">
+          <div className="w-8 h-8 rounded-lg bg-brand/10 border border-brand/20 flex items-center justify-center text-brand">
+            <Package size={16} />
+          </div>
+          <h2 className="font-semibold text-ink">Plan Limits</h2>
+        </div>
+
+        <div className="grid grid-cols-3 gap-4">
+          <LimitItem
+            icon={<ShoppingBag size={14} />}
+            label="Orders"
+            current={stats.totalOrders}
+            max={restaurant.plan === 'starter' ? 20 : 500}
+          />
+          <LimitItem
+            icon={<Package size={14} />}
+            label="Products"
+            current={stats.totalProducts}
+            max={restaurant.plan === 'starter' ? 30 : 999}
+          />
+          <LimitItem
+            icon={<Grid3x3 size={14} />}
+            label="Categories"
+            current={stats.totalCategories}
+            max={restaurant.plan === 'starter' ? 1 : 50}
+          />
+        </div>
       </motion.div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {stats.map((stat, i) => {
-          const colors = colorMap[stat.color];
-          return (
-            <motion.div
-              key={stat.label}
-              variants={fadeInUp}
-              transition={{ delay: i * 0.1 }}
-              whileHover={{ y: -4 }}
-              className="bg-[#0F0F0F] rounded-2xl p-5 border border-white/10 hover:border-red-600/30 transition"
-            >
-              <div className="flex items-center justify-between mb-4">
-                <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${colors.bg}`}>
-                  <stat.icon size={20} className={colors.text} />
-                </div>
-                <span className={`text-xs font-semibold flex items-center gap-1 ${stat.isUp ? "text-emerald-400" : "text-red-400"}`}>
-                  {stat.isUp ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
-                  {stat.change}
-                </span>
-              </div>
-              <p className="text-xs text-gray-400 mb-1">{stat.label}</p>
-              <p className="text-2xl font-bold">{stat.value}</p>
-            </motion.div>
-          );
-        })}
-      </div>
-
-      {/* Charts Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Revenue Chart */}
-        <motion.div
-          variants={fadeInUp}
-          className="lg:col-span-2 bg-[#0F0F0F] rounded-2xl p-5 border border-white/10"
-        >
-          <div className="flex items-center justify-between mb-5">
-            <div>
-              <h2 className="font-bold">Revenue Overview</h2>
-              <p className="text-xs text-gray-400">Last 7 days</p>
-            </div>
-            <select className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-red-600/50">
-              <option>This Week</option>
-              <option>Last Week</option>
-              <option>This Month</option>
-            </select>
-          </div>
-          <div className="w-full overflow-hidden">
-            <ResponsiveContainer width="100%" height={280}>
-              <AreaChart data={revenueData}>
-                <defs>
-                  <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#DC2626" stopOpacity={0.8} />
-                    <stop offset="95%" stopColor="#DC2626" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1a1a1a" />
-                <XAxis dataKey="day" stroke="#666" fontSize={12} />
-                <YAxis stroke="#666" fontSize={12} />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: "#0F0F0F",
-                    border: "1px solid #333",
-                    borderRadius: "12px",
-                    fontSize: "12px",
-                  }}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="revenue"
-                  stroke="#DC2626"
-                  strokeWidth={2}
-                  fillOpacity={1}
-                  fill="url(#colorRevenue)"
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </motion.div>
-
-        {/* Status Chart */}
-        <motion.div variants={fadeInUp} className="bg-[#0F0F0F] rounded-2xl p-5 border border-white/10">
-          <div className="mb-5">
-            <h2 className="font-bold">Order Status</h2>
-            <p className="text-xs text-gray-400">Today's breakdown</p>
-          </div>
-          <div className="w-full overflow-hidden">
-            <ResponsiveContainer width="100%" height={180}>
-              <PieChart>
-                <Pie
-                  data={statusData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={45}
-                  outerRadius={75}
-                  paddingAngle={5}
-                  dataKey="value"
-                >
-                  {statusData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: "#0F0F0F",
-                    border: "1px solid #333",
-                    borderRadius: "12px",
-                    fontSize: "12px",
-                  }}
-                />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-          <div className="space-y-2 mt-2">
-            {statusData.map((s) => (
-              <div key={s.name} className="flex items-center justify-between text-xs">
-                <div className="flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: s.color }}></span>
-                  <span className="text-gray-400">{s.name}</span>
-                </div>
-                <span className="font-semibold">{s.value}</span>
-              </div>
-            ))}
-          </div>
-        </motion.div>
-      </div>
-
-      {/* Bottom Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Recent Orders */}
-        <motion.div
-          variants={fadeInUp}
-          className="lg:col-span-2 bg-[#0F0F0F] rounded-2xl border border-white/10 overflow-hidden"
-        >
-          <div className="p-5 border-b border-white/10 flex items-center justify-between">
-            <div>
-              <h2 className="font-bold">Recent Orders</h2>
-              <p className="text-xs text-gray-400">Latest from your restaurant</p>
-            </div>
-            <a href="/dashboard/orders" className="text-xs text-amber-400 hover:text-amber-300 font-semibold">
-              View All
-            </a>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-white/5">
-                <tr className="text-left text-xs text-gray-500">
-                  <th className="px-5 py-3 font-medium">Order</th>
-                  <th className="px-5 py-3 font-medium">Customer</th>
-                  <th className="px-5 py-3 font-medium">Total</th>
-                  <th className="px-5 py-3 font-medium">Status</th>
-                  <th className="px-5 py-3 font-medium hidden md:table-cell">Time</th>
-                </tr>
-              </thead>
-              <tbody>
-                {recentOrders.map((order) => (
-                  <tr key={order.id} className="border-b border-white/5 last:border-0 hover:bg-white/5 transition">
-                    <td className="px-5 py-3 text-amber-400 font-semibold">{order.id}</td>
-                    <td className="px-5 py-3">{order.customer}</td>
-                    <td className="px-5 py-3 font-semibold">{order.total}</td>
-                    <td className="px-5 py-3">
-                      <span
-                        className={`px-2.5 py-1 rounded-full text-[10px] font-semibold ${
-                          order.status === "Completed"
-                            ? "bg-emerald-500/20 text-emerald-400"
-                            : order.status === "Pending"
-                            ? "bg-amber-500/20 text-amber-400"
-                            : "bg-cyan-500/20 text-cyan-400"
-                        }`}
-                      >
-                        {order.status}
-                      </span>
-                    </td>
-                    <td className="px-5 py-3 text-xs text-gray-500 hidden md:table-cell">{order.time}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </motion.div>
-
-        {/* Popular Products */}
-        <motion.div
-          variants={fadeInUp}
-          className="bg-[#0F0F0F] rounded-2xl border border-white/10 overflow-hidden"
-        >
-          <div className="p-5 border-b border-white/10">
-            <h2 className="font-bold">Popular Products</h2>
-            <p className="text-xs text-gray-400">Best sellers this week</p>
-          </div>
-          <div className="p-3">
-            {popularProducts.map((p, i) => (
-              <div
-                key={p.name}
-                className="flex items-center justify-between p-3 rounded-xl hover:bg-white/5 transition"
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-8 h-8 bg-gradient-to-br from-red-600/20 to-amber-500/20 rounded-lg flex items-center justify-center text-xs font-bold text-amber-400">
-                    {i + 1}
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold truncate">{p.name}</p>
-                    <p className="text-xs text-gray-500">{p.sales} sales</p>
-                  </div>
-                </div>
-                <span className="text-sm font-bold text-amber-400">{p.revenue}</span>
-              </div>
-            ))}
-          </div>
-        </motion.div>
-      </div>
-
-      {/* Orders Bar Chart */}
+      {/* Recent Orders */}
       <motion.div
-        variants={fadeInUp}
-        className="bg-[#0F0F0F] rounded-2xl p-5 border border-white/10"
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.25 }}
+        className="bg-surface border border-line rounded-2xl p-5 md:p-6 shadow-soft"
       >
         <div className="flex items-center justify-between mb-5">
-          <div>
-            <h2 className="font-bold">Orders by Day</h2>
-            <p className="text-xs text-gray-400">Weekly order volume</p>
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-brand/10 border border-brand/20 flex items-center justify-center text-brand">
+              <TrendingUp size={16} />
+            </div>
+            <h2 className="font-semibold text-ink">Recent Orders</h2>
           </div>
+          <Link
+            href="/dashboard/orders"
+            className="text-sm text-brand hover:underline flex items-center gap-1 font-medium"
+          >
+            View all
+            <ArrowRight size={14} />
+          </Link>
         </div>
-        <div className="w-full overflow-hidden">
-          <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={revenueData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#1a1a1a" />
-              <XAxis dataKey="day" stroke="#666" fontSize={12} />
-              <YAxis stroke="#666" fontSize={12} />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: "#0F0F0F",
-                  border: "1px solid #333",
-                  borderRadius: "12px",
-                  fontSize: "12px",
-                }}
-              />
-              <Bar dataKey="orders" fill="#F59E0B" radius={[8, 8, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
+
+        {recentOrders.length === 0 ? (
+          <div className="text-center py-12">
+            <div className="w-16 h-16 rounded-2xl bg-brand/10 mx-auto flex items-center justify-center mb-4">
+              <ShoppingBag size={28} className="text-brand" />
+            </div>
+            <p className="text-ink-muted font-medium">No orders yet</p>
+            <p className="text-sm text-ink-muted/70 mt-1">
+              Orders will appear here once customers start ordering
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {recentOrders.map((order) => (
+              <Link
+                key={order.id}
+                href="/dashboard/orders"
+                className="flex items-center gap-3 p-3 rounded-xl hover:bg-cream transition"
+              >
+                <div className="w-10 h-10 rounded-xl bg-brand/10 flex items-center justify-center text-brand shrink-0">
+                  <ShoppingBag size={16} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-ink truncate">
+                    Order #{order.id.slice(0, 6)}
+                  </p>
+                  <p className="text-xs text-ink-muted">
+                    {new Date(order.created_at).toLocaleString()}
+                  </p>
+                </div>
+                <span className="font-bold text-brand text-sm">
+                  ${Number(order.total).toFixed(2)}
+                </span>
+              </Link>
+            ))}
+          </div>
+        )}
       </motion.div>
+    </div>
+  );
+}
+
+function StatCard({
+  icon,
+  label,
+  value,
+  delay,
+  highlight,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  delay: number;
+  highlight?: boolean;
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay }}
+      className={`bg-surface border rounded-2xl p-4 md:p-5 shadow-soft ${
+        highlight ? 'border-amber-custom/40' : 'border-line'
+      }`}
+    >
+      <div
+        className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${
+          highlight
+            ? 'bg-amber-custom/10 text-amber-custom'
+            : 'bg-brand/10 text-brand'
+        }`}
+      >
+        {icon}
+      </div>
+      <p className="text-xs text-ink-muted uppercase tracking-wider">
+        {label}
+      </p>
+      <p className="text-xl md:text-2xl font-bold text-ink mt-1">{value}</p>
     </motion.div>
+  );
+}
+
+function LimitItem({
+  icon,
+  label,
+  current,
+  max,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  current: number;
+  max: number;
+}) {
+  const pct = max > 0 ? Math.min((current / max) * 100, 100) : 0;
+  const isWarning = pct >= 80;
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-2">
+        <span className="flex items-center gap-1.5 text-xs font-medium text-ink-muted">
+          {icon}
+          {label}
+        </span>
+        <span
+          className={`text-xs font-bold ${
+            isWarning ? 'text-amber-custom' : 'text-ink'
+          }`}
+        >
+          {current}/{max}
+        </span>
+      </div>
+      <div className="h-1.5 bg-cream rounded-full overflow-hidden">
+        <div
+          className={`h-full rounded-full transition-all ${
+            isWarning ? 'bg-amber-custom' : 'bg-brand'
+          }`}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+    </div>
   );
 }

@@ -1,266 +1,445 @@
-"use client";
+'use client';
 
-import { motion, AnimatePresence } from "framer-motion";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from 'react';
+import { motion } from 'framer-motion';
 import {
-  Search,
-  Filter,
-  Eye,
   Check,
-  X,
-  Clock,
-  ChefHat,
-  Bike,
-  CheckCircle2,
   XCircle,
+  Eye,
+  Search,
+  Clock,
   Phone,
   MapPin,
-  DollarSign,
-} from "lucide-react";
+  Truck,
+  Store,
+  ShoppingBag,
+} from 'lucide-react';
+import { createClient } from '@/lib/supabase/client';
+import { useRestaurant } from '@/lib/hooks/useRestaurant';
+import { useOrderNotifications } from '@/lib/hooks/useOrderNotifications';
+import NotificationButton from '@/components/NotificationButton';
 
-type OrderStatus = "Pending" | "Accepted" | "Preparing" | "Ready" | "Out for Delivery" | "Completed" | "Cancelled";
+const supabase = createClient();
 
-const statusConfig: Record<OrderStatus, { color: string; bg: string; border: string }> = {
-  Pending: { color: "text-amber-400", bg: "bg-amber-500/20", border: "border-amber-500/30" },
-  Accepted: { color: "text-cyan-400", bg: "bg-cyan-500/20", border: "border-cyan-500/30" },
-  Preparing: { color: "text-blue-400", bg: "bg-blue-500/20", border: "border-blue-500/30" },
-  Ready: { color: "text-violet-400", bg: "bg-violet-500/20", border: "border-violet-500/30" },
-  "Out for Delivery": { color: "text-orange-400", bg: "bg-orange-500/20", border: "border-orange-500/30" },
-  Completed: { color: "text-emerald-400", bg: "bg-emerald-500/20", border: "border-emerald-500/30" },
-  Cancelled: { color: "text-red-400", bg: "bg-red-500/20", border: "border-red-500/30" },
+type OrderStatus =
+  | 'pending'
+  | 'accepted'
+  | 'preparing'
+  | 'ready'
+  | 'out_for_delivery'
+  | 'completed'
+  | 'cancelled';
+
+type OrderItem = {
+  id: string;
+  product_name: string;
+  price: number;
+  quantity: number;
+  total: number;
 };
 
-const allOrders = [
-  { id: "#1048", customer: "Ahmad Ali", phone: "70 123 456", items: "2× Burger, 1× Fries", subtotal: 17, delivery: 2, total: 19, status: "Pending" as OrderStatus, type: "Delivery", address: "Hamra, Beirut", time: "2 min ago" },
-  { id: "#1047", customer: "Sarah Smith", phone: "71 234 567", items: "1× Pizza, 2× Pepsi", subtotal: 18, delivery: 2, total: 20, status: "Preparing" as OrderStatus, type: "Delivery", address: "Verdun, Beirut", time: "8 min ago" },
-  { id: "#1046", customer: "Omar Khaled", phone: "76 345 678", items: "3× Chicken, 1× Salad", subtotal: 32, delivery: 2, total: 34, status: "Completed" as OrderStatus, type: "Delivery", address: "Achrafieh, Beirut", time: "25 min ago" },
-  { id: "#1045", customer: "Layla Ahmad", phone: "78 456 789", items: "1× Pasta, 1× Juice", subtotal: 15, delivery: 0, total: 15, status: "Completed" as OrderStatus, type: "Pickup", address: "—", time: "45 min ago" },
-  { id: "#1044", customer: "Hassan Ali", phone: "79 567 890", items: "2× Burger, 2× Fries", subtotal: 26, delivery: 2, total: 28, status: "Out for Delivery" as OrderStatus, type: "Delivery", address: "Downtown, Beirut", time: "1h ago" },
-  { id: "#1043", customer: "Nour Ibrahim", phone: "70 678 901", items: "1× Cake, 1× Coffee", subtotal: 12, delivery: 2, total: 14, status: "Cancelled" as OrderStatus, type: "Delivery", address: "Jounieh", time: "1h ago" },
-  { id: "#1042", customer: "Maya Khalil", phone: "71 789 012", items: "2× Pizza", subtotal: 24, delivery: 2, total: 26, status: "Accepted" as OrderStatus, type: "Delivery", address: "Badaro, Beirut", time: "2h ago" },
-  { id: "#1041", customer: "James Smith", phone: "76 890 123", items: "1× Burger, 1× Coke", subtotal: 11, delivery: 2, total: 13, status: "Ready" as OrderStatus, type: "Delivery", address: "Gemmayzeh, Beirut", time: "2h ago" },
-];
+type Order = {
+  id: string;
+  order_number: string;
+  restaurant_id: string;
+  customer_name: string;
+  customer_phone: string;
+  type: 'delivery' | 'pickup';
+  address: string | null;
+  notes: string | null;
+  subtotal: number;
+  delivery_fee: number;
+  total: number;
+  status: OrderStatus;
+  created_at: string;
+  order_items?: OrderItem[];
+};
 
-const statusFilters: (OrderStatus | "All")[] = ["All", "Pending", "Accepted", "Preparing", "Ready", "Out for Delivery", "Completed", "Cancelled"];
+const statusConfig: Record<
+  OrderStatus | 'all',
+  { label: string; badge: string }
+> = {
+  all: { label: 'All', badge: 'bg-brand/10 text-brand border-brand/20' },
+  pending: {
+    label: 'Pending',
+    badge: 'bg-amber-custom/10 text-amber-custom border-amber-custom/20',
+  },
+  accepted: {
+    label: 'Accepted',
+    badge: 'bg-blue-500/10 text-blue-600 border-blue-500/20',
+  },
+  preparing: {
+    label: 'Preparing',
+    badge: 'bg-purple-500/10 text-purple-600 border-purple-500/20',
+  },
+  ready: {
+    label: 'Ready',
+    badge: 'bg-cyan-500/10 text-cyan-600 border-cyan-500/20',
+  },
+  out_for_delivery: {
+    label: 'Out for Delivery',
+    badge: 'bg-brand/10 text-brand border-brand/20',
+  },
+  completed: {
+    label: 'Completed',
+    badge: 'bg-green-500/10 text-green-600 border-green-500/20',
+  },
+  cancelled: {
+    label: 'Cancelled',
+    badge: 'bg-red-500/10 text-red-600 border-red-500/20',
+  },
+};
 
-const statusActions: Record<OrderStatus, OrderStatus | null> = {
-  Pending: "Accepted",
-  Accepted: "Preparing",
-  Preparing: "Ready",
-  Ready: "Out for Delivery",
-  "Out for Delivery": "Completed",
-  Completed: null,
-  Cancelled: null,
+const nextStatusMap: Partial<Record<OrderStatus, OrderStatus>> = {
+  pending: 'accepted',
+  accepted: 'preparing',
+  preparing: 'ready',
+  ready: 'out_for_delivery',
+  out_for_delivery: 'completed',
 };
 
 export default function OrdersPage() {
-  const [orders, setOrders] = useState(allOrders);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState<OrderStatus | "All">("All");
+  const { restaurant, loading: restaurantLoading } = useRestaurant();
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [statusFilter, setStatusFilter] = useState<OrderStatus | 'all'>('all');
+  const [searchTerm, setSearchTerm] = useState('');
+
+  useOrderNotifications(orders);
+
+  useEffect(() => {
+    if (!restaurant?.id) return;
+    let cancelled = false;
+
+    const fetchOrders = async () => {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('orders')
+        .select('*, order_items(*)')
+        .eq('restaurant_id', restaurant.id)
+        .order('created_at', { ascending: false });
+
+      if (cancelled) return;
+
+      if (error) {
+        console.error('❌ Fetch orders failed:', error);
+      } else {
+        setOrders((data ?? []) as Order[]);
+      }
+      setLoading(false);
+    };
+
+    fetchOrders();
+
+    const channel = supabase
+      .channel(`orders-${restaurant.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'orders',
+          filter: `restaurant_id=eq.${restaurant.id}`,
+        },
+        () => fetchOrders()
+      )
+      .subscribe((status) => console.log('📡 Realtime:', status));
+
+    return () => {
+      cancelled = true;
+      supabase.removeChannel(channel);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [restaurant?.id]);
+
+  const updateStatus = async (id: string, newStatus: OrderStatus) => {
+    const previous = orders;
+    setOrders((prev) =>
+      prev.map((o) => (o.id === id ? { ...o, status: newStatus } : o))
+    );
+
+    const { error } = await supabase
+      .from('orders')
+      .update({ status: newStatus })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) {
+      setOrders(previous);
+      alert(`Failed: ${error.message}`);
+    }
+  };
+
+  const cancelOrder = (id: string) => updateStatus(id, 'cancelled');
 
   const filteredOrders = orders.filter((order) => {
+    const q = searchTerm.toLowerCase();
     const matchesSearch =
-      order.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.customer.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.phone.includes(searchTerm);
-    const matchesStatus = statusFilter === "All" || order.status === statusFilter;
+      (order.order_number ?? '').toLowerCase().includes(q) ||
+      order.customer_name.toLowerCase().includes(q) ||
+      order.customer_phone.includes(searchTerm);
+    const matchesStatus =
+      statusFilter === 'all' || order.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
 
-  const updateStatus = (id: string, newStatus: OrderStatus) => {
-    setOrders((prev) => prev.map((o) => (o.id === id ? { ...o, status: newStatus } : o)));
+  const statusCounts: Record<OrderStatus | 'all', number> = {
+    all: orders.length,
+    pending: orders.filter((o) => o.status === 'pending').length,
+    accepted: orders.filter((o) => o.status === 'accepted').length,
+    preparing: orders.filter((o) => o.status === 'preparing').length,
+    ready: orders.filter((o) => o.status === 'ready').length,
+    out_for_delivery: orders.filter((o) => o.status === 'out_for_delivery')
+      .length,
+    completed: orders.filter((o) => o.status === 'completed').length,
+    cancelled: orders.filter((o) => o.status === 'cancelled').length,
   };
 
-  const cancelOrder = (id: string) => {
-    setOrders((prev) => prev.map((o) => (o.id === id ? { ...o, status: "Cancelled" as OrderStatus } : o)));
-  };
+  if (restaurantLoading || loading) {
+    return (
+      <div className="min-h-screen bg-cream p-8 flex items-center justify-center">
+        <div className="w-8 h-8 rounded-full border-2 border-brand border-t-transparent animate-spin" />
+      </div>
+    );
+  }
 
-  const statusCounts = {
-    All: orders.length,
-    Pending: orders.filter((o) => o.status === "Pending").length,
-    Accepted: orders.filter((o) => o.status === "Accepted").length,
-    Preparing: orders.filter((o) => o.status === "Preparing").length,
-    Ready: orders.filter((o) => o.status === "Ready").length,
-    "Out for Delivery": orders.filter((o) => o.status === "Out for Delivery").length,
-    Completed: orders.filter((o) => o.status === "Completed").length,
-    Cancelled: orders.filter((o) => o.status === "Cancelled").length,
-  };
+  if (!restaurant) {
+    return (
+      <div className="min-h-screen bg-cream p-8 text-center">
+        <p className="text-red-500">No restaurant found</p>
+      </div>
+    );
+  }
 
   return (
-    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="space-y-6">
+    <div className="min-h-screen bg-cream p-4 md:p-6">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold">Orders</h1>
-          <p className="text-sm text-gray-400">Manage and track all your restaurant orders</p>
+          <h1 className="text-2xl md:text-3xl font-bold text-ink">Orders</h1>
+          <p className="text-sm text-ink-muted mt-1">
+            Manage and track all your restaurant orders
+          </p>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="px-4 py-2 bg-emerald-500/10 border border-emerald-500/30 rounded-xl flex items-center gap-2">
-            <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></span>
-            <span className="text-xs font-semibold text-emerald-400">Live</span>
+        <div className="flex items-center gap-2">
+          <NotificationButton />
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-green-500/10 border border-green-500/20">
+            <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+            <span className="text-xs font-medium text-green-600">Live</span>
           </div>
         </div>
       </div>
 
-      {/* Status Filters */}
-      <div className="flex gap-2 overflow-x-auto pb-2">
-        {statusFilters.map((status) => {
-          const isActive = statusFilter === status;
-          const count = statusCounts[status];
-          return (
-            <button
-              key={status}
-              onClick={() => setStatusFilter(status)}
-              className={`px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition flex items-center gap-2 ${
-                isActive
-                  ? "bg-gradient-to-r from-red-600 to-amber-500 text-white"
-                  : "bg-white/5 text-gray-400 hover:bg-white/10"
-              }`}
-            >
-              {status}
-              <span className={`px-1.5 py-0.5 rounded-full text-[10px] ${isActive ? "bg-white/20" : "bg-white/10"}`}>
-                {count}
-              </span>
-            </button>
-          );
-        })}
+      {/* Filters */}
+      <div className="flex flex-wrap gap-2 mb-4">
+        {(
+          [
+            'all',
+            'pending',
+            'accepted',
+            'preparing',
+            'ready',
+            'out_for_delivery',
+            'completed',
+            'cancelled',
+          ] as const
+        ).map((key) => (
+          <button
+            key={key}
+            onClick={() => setStatusFilter(key)}
+            className={`px-4 py-2 rounded-full text-sm font-medium transition ${
+              statusFilter === key
+                ? 'bg-brand text-white shadow-brand'
+                : 'bg-surface border border-line text-ink-muted hover:text-ink hover:border-brand/30'
+            }`}
+          >
+            {statusConfig[key].label}
+            <span className="ml-2 text-xs opacity-70">
+              {statusCounts[key]}
+            </span>
+          </button>
+        ))}
       </div>
 
       {/* Search */}
-      <div className="bg-[#0F0F0F] rounded-2xl border border-white/10 p-4">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
-          <input
-            type="text"
-            placeholder="Search by order number, customer name, or phone..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full bg-white/5 border border-white/10 rounded-xl py-3 pl-10 pr-4 text-sm focus:outline-none focus:border-red-600/50 transition"
-          />
-        </div>
+      <div className="relative mb-6">
+        <Search
+          size={18}
+          className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-muted"
+        />
+        <input
+          type="text"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          placeholder="Search by order number, customer name, or phone..."
+          className="w-full bg-surface border border-line rounded-xl py-3 pl-10 pr-4 text-sm text-ink placeholder:text-ink-muted/50 focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
+        />
       </div>
 
-      {/* Orders List */}
-      <div className="space-y-3">
-        <AnimatePresence mode="popLayout">
-          {filteredOrders.length === 0 ? (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="bg-[#0F0F0F] rounded-2xl border border-white/10 p-12 text-center"
-            >
-              <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Search size={24} className="text-gray-600" />
-              </div>
-              <p className="text-gray-400 mb-1">No orders found</p>
-              <p className="text-xs text-gray-600">Try adjusting your search or filters</p>
-            </motion.div>
-          ) : (
-            filteredOrders.map((order, i) => {
-              const config = statusConfig[order.status];
-              const nextStatus = statusActions[order.status];
-              return (
-                <motion.div
-                  key={order.id}
-                  layout
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, scale: 0.95 }}
-                  transition={{ delay: i * 0.03 }}
-                  className="bg-[#0F0F0F] rounded-2xl border border-white/10 overflow-hidden hover:border-white/20 transition"
-                >
-                  <div className="p-5">
-                    {/* Header Row */}
-                    <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 bg-gradient-to-br from-red-600/20 to-amber-500/20 rounded-xl flex items-center justify-center">
-                          <ChefHat size={22} className="text-amber-400" />
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-lg font-bold text-amber-400">{order.id}</span>
-                            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${config.bg} ${config.color} ${config.border}`}>
-                              {order.status}
-                            </span>
-                          </div>
-                          <p className="text-xs text-gray-500 mt-0.5">{order.time}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 ${order.type === "Delivery" ? "bg-orange-500/20 text-orange-400" : "bg-cyan-500/20 text-cyan-400"}`}>
-                          {order.type === "Delivery" ? <Bike size={14} /> : <MapPin size={14} />}
-                          {order.type}
-                        </span>
-                        <span className="px-3 py-1.5 rounded-lg bg-white/5 text-sm font-bold text-amber-400">
-                          ${order.total}
-                        </span>
-                      </div>
+      {/* Orders */}
+      {filteredOrders.length === 0 ? (
+        <div className="text-center py-16 bg-surface border border-line rounded-2xl shadow-soft">
+          <div className="w-16 h-16 rounded-2xl bg-brand/10 mx-auto flex items-center justify-center mb-4">
+            <ShoppingBag size={28} className="text-brand" />
+          </div>
+          <p className="text-ink-muted font-medium">No orders found</p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {filteredOrders.map((order, idx) => {
+            const nextStatus = nextStatusMap[order.status];
+            const cfg = statusConfig[order.status];
+            return (
+              <motion.div
+                key={order.id}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: Math.min(idx * 0.03, 0.3) }}
+                className="bg-surface border border-line rounded-2xl p-4 md:p-5 shadow-soft"
+              >
+                {/* Header */}
+                <div className="flex flex-wrap items-center gap-3 mb-4">
+                  <div className="w-10 h-10 rounded-xl bg-brand/10 flex items-center justify-center text-brand shrink-0">
+                    <Clock size={18} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-sm font-bold text-ink">
+                        {order.order_number}
+                      </span>
+                      <span
+                        className={`text-xs px-2 py-0.5 rounded-full border font-medium ${cfg.badge}`}
+                      >
+                        {cfg.label}
+                      </span>
                     </div>
+                    <p className="text-xs text-ink-muted mt-0.5">
+                      {new Date(order.created_at).toLocaleString()}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="flex items-center gap-1 text-xs px-2 py-1 rounded-lg bg-cream text-ink-muted">
+                      {order.type === 'delivery' ? (
+                        <Truck size={12} />
+                      ) : (
+                        <Store size={12} />
+                      )}
+                      {order.type === 'delivery' ? 'Delivery' : 'Pickup'}
+                    </span>
+                    <span className="text-lg font-bold text-brand">
+                      ${order.total.toFixed(2)}
+                    </span>
+                  </div>
+                </div>
 
-                    {/* Details Grid */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                      <div className="bg-white/5 rounded-xl p-3">
-                        <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Customer</p>
-                        <p className="text-sm font-semibold">{order.customer}</p>
-                        <p className="text-xs text-gray-400 flex items-center gap-1 mt-1">
-                          <Phone size={12} />
-                          {order.phone}
-                        </p>
-                      </div>
-                      <div className="bg-white/5 rounded-xl p-3 md:col-span-2">
-                        <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Items</p>
-                        <p className="text-sm text-gray-300">{order.items}</p>
-                        {order.type === "Delivery" && (
-                          <p className="text-xs text-gray-400 flex items-center gap-1 mt-1">
-                            <MapPin size={12} />
-                            {order.address}
+                {/* Body */}
+                <div className="grid md:grid-cols-3 gap-3 mb-4">
+                  <div className="bg-cream rounded-xl p-3">
+                    <p className="text-xs text-ink-muted uppercase tracking-wider mb-1">
+                      Customer
+                    </p>
+                    <p className="font-semibold text-sm text-ink">
+                      {order.customer_name}
+                    </p>
+                    <p className="text-xs text-ink-muted flex items-center gap-1 mt-1">
+                      <Phone size={11} /> {order.customer_phone}
+                    </p>
+                  </div>
+
+                  <div className="bg-cream rounded-xl p-3">
+                    <p className="text-xs text-ink-muted uppercase tracking-wider mb-1">
+                      Items
+                    </p>
+                    <div className="space-y-1">
+                      {order.order_items && order.order_items.length > 0 ? (
+                        order.order_items.map((item) => (
+                          <p key={item.id} className="text-xs text-ink">
+                            {item.quantity}x {item.product_name}
                           </p>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Price Breakdown */}
-                    <div className="flex items-center justify-between text-xs text-gray-400 mb-4 pb-4 border-b border-white/10">
-                      <span>Subtotal: <span className="text-white font-semibold">${order.subtotal}</span></span>
-                      <span>Delivery: <span className="text-white font-semibold">${order.delivery}</span></span>
-                      <span>Total: <span className="text-amber-400 font-bold">${order.total}</span></span>
-                    </div>
-
-                    {/* Actions */}
-                    <div className="flex flex-wrap items-center gap-2">
-                      {nextStatus && (
-                        <motion.button
-                          whileHover={{ scale: 1.03 }}
-                          whileTap={{ scale: 0.97 }}
-                          onClick={() => updateStatus(order.id, nextStatus)}
-                          className="flex-1 md:flex-none px-4 py-2.5 bg-gradient-to-r from-red-600 to-amber-500 rounded-xl text-sm font-semibold hover:opacity-90 transition flex items-center justify-center gap-2"
-                        >
-                          <Check size={16} />
-                          Accept as {nextStatus}
-                        </motion.button>
+                        ))
+                      ) : (
+                        <p className="text-xs text-ink-muted">—</p>
                       )}
-                      {order.status === "Pending" && (
-                        <motion.button
-                          whileHover={{ scale: 1.03 }}
-                          whileTap={{ scale: 0.97 }}
-                          onClick={() => cancelOrder(order.id)}
-                          className="px-4 py-2.5 bg-red-500/10 border border-red-500/30 text-red-400 rounded-xl text-sm font-semibold hover:bg-red-500/20 transition flex items-center gap-2"
-                        >
-                          <XCircle size={16} />
-                          Reject
-                        </motion.button>
-                      )}
-                      <button className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white transition">
-                        <Eye size={16} />
-                      </button>
                     </div>
                   </div>
-                </motion.div>
-              );
-            })
-          )}
-        </AnimatePresence>
-      </div>
-    </motion.div>
+
+                  <div className="bg-cream rounded-xl p-3">
+                    {order.address ? (
+                      <>
+                        <p className="text-xs text-ink-muted uppercase tracking-wider mb-1 flex items-center gap-1">
+                          <MapPin size={11} /> Address
+                        </p>
+                        <p className="text-xs text-ink">{order.address}</p>
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-xs text-ink-muted uppercase tracking-wider mb-1">
+                          Pickup
+                        </p>
+                        <p className="text-xs text-ink">In-store</p>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {/* Notes */}
+                {order.notes && (
+                  <div className="bg-amber-custom/5 border border-amber-custom/20 rounded-xl p-3 mb-4">
+                    <p className="text-xs uppercase tracking-wider text-amber-custom font-medium mb-1">
+                      Notes
+                    </p>
+                    <p className="text-xs text-ink">{order.notes}</p>
+                  </div>
+                )}
+
+                {/* Footer */}
+                <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-line">
+                  <div className="flex items-center gap-3 text-xs text-ink-muted">
+                    <span>Subtotal: ${order.subtotal.toFixed(2)}</span>
+                    {order.delivery_fee > 0 && (
+                      <span>Delivery: ${order.delivery_fee.toFixed(2)}</span>
+                    )}
+                    <span className="font-bold text-ink">
+                      Total: ${order.total.toFixed(2)}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    {nextStatus && (
+                      <motion.button
+                        whileHover={{ scale: 1.03 }}
+                        whileTap={{ scale: 0.97 }}
+                        onClick={() => updateStatus(order.id, nextStatus)}
+                        className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-brand hover:bg-brand-dark text-white text-sm font-semibold shadow-brand transition"
+                      >
+                        <Check size={16} />
+                        Move to {statusConfig[nextStatus].label}
+                      </motion.button>
+                    )}
+
+                    {order.status === 'pending' && (
+                      <motion.button
+                        whileHover={{ scale: 1.03 }}
+                        whileTap={{ scale: 0.97 }}
+                        onClick={() => cancelOrder(order.id)}
+                        className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-600 text-sm font-semibold hover:bg-red-500/20 transition"
+                      >
+                        <XCircle size={16} />
+                        Reject
+                      </motion.button>
+                    )}
+
+                    <button className="p-2.5 rounded-xl bg-cream hover:bg-brand/10 text-ink-muted hover:text-brand transition">
+                      <Eye size={16} />
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
 }

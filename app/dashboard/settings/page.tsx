@@ -1,415 +1,498 @@
-"use client";
+'use client';
 
-import { motion } from "framer-motion";
-import { useState } from "react";
+import { useEffect, useState } from 'react';
+import { motion } from 'framer-motion';
 import {
-  Store,
-  Palette,
-  Clock,
-  CreditCard,
-  Bell,
-  MessageCircle,
   Save,
-  Upload,
+  Loader2,
+  Store,
+  Phone,
+  Image as ImageIcon,
+  Truck,
+  DollarSign,
+  Link as LinkIcon,
   Check,
-} from "lucide-react";
+} from 'lucide-react';
+import { createClient } from '@/lib/supabase/client';
+import { useRestaurant } from '@/lib/hooks/useRestaurant';
+import { uploadImage } from '@/lib/utils/uploadImage';
 
-const tabs = [
-  { id: "business", name: "Business", icon: Store },
-  { id: "branding", name: "Branding", icon: Palette },
-  { id: "hours", name: "Working Hours", icon: Clock },
-  { id: "payments", name: "Payments", icon: CreditCard },
-  { id: "notifications", name: "Notifications", icon: Bell },
-  { id: "whatsapp", name: "WhatsApp", icon: MessageCircle },
+const supabase = createClient();
+
+const CURRENCIES = [
+  { code: 'USD', label: 'USD — US Dollar ($)' },
+  { code: 'LBP', label: 'LBP — Lebanese Pound (ل.ل)' },
+  { code: 'EUR', label: 'EUR — Euro (€)' },
+  { code: 'SAR', label: 'SAR — Saudi Riyal (ر.س)' },
+  { code: 'AED', label: 'AED — UAE Dirham (د.إ)' },
 ];
 
-const fadeInUp = {
-  hidden: { opacity: 0, y: 30 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.4 } },
-};
-
-const stagger = {
-  hidden: { opacity: 0 },
-  visible: { opacity: 1, transition: { staggerChildren: 0.05 } },
+type FormState = {
+  name: string;
+  name_ar: string;
+  description: string;
+  description_ar: string;
+  phone: string;
+  address: string;
+  city: string;
+  logo_url: string;
+  cover_url: string;
+  currency: string;
+  delivery_fee: number;
+  min_order: number;
+  is_active: boolean;
+  accepts_delivery: boolean;
+  accepts_pickup: boolean;
 };
 
 export default function SettingsPage() {
-  const [activeTab, setActiveTab] = useState("business");
-  const [saved, setSaved] = useState(false);
-  const [businessName, setBusinessName] = useState("Snack");
-  const [slug, setSlug] = useState("snack");
-  const [primaryColor, setPrimaryColor] = useState("#DC2626");
-  const [secondaryColor, setSecondaryColor] = useState("#F59E0B");
-  const [whatsapp, setWhatsapp] = useState("+961 70 053 406");
-  const [deliveryFee, setDeliveryFee] = useState(2);
-  const [payments, setPayments] = useState({
-    cash: true,
-    whish: true,
-    card: false,
-    omt: true,
-  });
-  const [notifications, setNotifications] = useState({
-    newOrders: true,
-    cancelled: true,
-    newCustomers: false,
-    dailySummary: true,
-  });
+  const { restaurant, loading: restaurantLoading, refresh } = useRestaurant();
+  const [form, setForm] = useState<FormState | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [uploadingCover, setUploadingCover] = useState(false);
+  const [success, setSuccess] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSave = () => {
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+  useEffect(() => {
+    if (!restaurant) return;
+    setForm({
+      name: restaurant.name ?? '',
+      name_ar: restaurant.name_ar ?? '',
+      description: restaurant.description ?? '',
+      description_ar: restaurant.description_ar ?? '',
+      phone: restaurant.phone ?? '',
+      address: restaurant.address ?? '',
+      city: restaurant.city ?? '',
+      logo_url: restaurant.logo_url ?? '',
+      cover_url: restaurant.cover_url ?? '',
+      currency: restaurant.currency ?? 'USD',
+      delivery_fee: restaurant.delivery_fee ?? 0,
+      min_order: restaurant.min_order ?? 0,
+      is_active: restaurant.is_active ?? true,
+      accepts_delivery: restaurant.accepts_delivery ?? true,
+      accepts_pickup: restaurant.accepts_pickup ?? true,
+    });
+  }, [restaurant]);
+
+  if (restaurantLoading || !form) {
+    return (
+      <div className="min-h-screen bg-cream flex items-center justify-center">
+        <Loader2 size={32} className="animate-spin text-brand" />
+      </div>
+    );
+  }
+
+  if (!restaurant) {
+    return (
+      <div className="min-h-screen bg-cream p-8 text-center">
+        <p className="text-red-500">No restaurant found</p>
+      </div>
+    );
+  }
+
+  const update = <K extends keyof FormState>(key: K, value: FormState[K]) => {
+    setForm((prev) => (prev ? { ...prev, [key]: value } : prev));
+  };
+
+  const handleUpload = async (
+    file: File,
+    key: 'logo_url' | 'cover_url'
+  ) => {
+    const setUploading =
+      key === 'logo_url' ? setUploadingLogo : setUploadingCover;
+    setUploading(true);
+    setError(null);
+    try {
+      const url = await uploadImage(file);
+      if (!url) {
+        setError('Upload failed');
+        return;
+      }
+      update(key, url);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Upload failed');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    setError(null);
+    setSuccess(false);
+
+    const { error: updateError } = await supabase
+      .from('restaurants')
+      .update({
+        name: form.name.trim(),
+        name_ar: form.name_ar.trim() || null,
+        description: form.description.trim() || null,
+        description_ar: form.description_ar.trim() || null,
+        phone: form.phone.trim() || null,
+        address: form.address.trim() || null,
+        city: form.city.trim() || null,
+        logo_url: form.logo_url || null,
+        cover_url: form.cover_url || null,
+        currency: form.currency,
+        delivery_fee: form.delivery_fee,
+        min_order: form.min_order,
+        is_active: form.is_active,
+        accepts_delivery: form.accepts_delivery,
+        accepts_pickup: form.accepts_pickup,
+      })
+      .eq('id', restaurant.id);
+
+    setSaving(false);
+
+    if (updateError) {
+      setError(updateError.message);
+      return;
+    }
+
+    setSuccess(true);
+    await refresh();
+    setTimeout(() => setSuccess(false), 2500);
   };
 
   return (
-    <motion.div initial="hidden" animate="visible" variants={stagger} className="space-y-6">
-      {/* Header */}
-      <motion.div variants={fadeInUp} className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+    <div className="min-h-screen bg-cream p-4 md:p-6">
+      <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold">Settings</h1>
-          <p className="text-sm text-gray-400">Manage your restaurant configuration</p>
+          <h1 className="text-2xl md:text-3xl font-bold text-ink">Settings</h1>
+          <p className="text-sm text-ink-muted mt-1">
+            Manage your restaurant information and preferences
+          </p>
         </div>
-        <button
+        <motion.button
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
           onClick={handleSave}
-          className="bg-gradient-to-r from-red-600 to-amber-500 px-5 py-2.5 rounded-xl text-sm font-semibold hover:opacity-90 transition flex items-center justify-center gap-2"
+          disabled={saving}
+          className="flex items-center gap-2 px-5 py-3 rounded-xl bg-brand hover:bg-brand-dark text-white font-semibold shadow-brand disabled:opacity-50 transition"
         >
-          {saved ? <Check size={16} /> : <Save size={16} />}
-          {saved ? "Saved!" : "Save Changes"}
-        </button>
-      </motion.div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* Sidebar Tabs */}
-        <motion.div variants={fadeInUp} className="lg:col-span-1">
-          <div className="bg-[#0F0F0F] rounded-2xl border border-white/10 p-2 space-y-1 lg:sticky lg:top-24">
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition ${
-                  activeTab === tab.id
-                    ? "bg-gradient-to-r from-red-600/20 to-amber-500/10 text-amber-400 border border-red-600/30"
-                    : "text-gray-400 hover:bg-white/5 hover:text-white"
-                }`}
-              >
-                <tab.icon size={16} />
-                {tab.name}
-              </button>
-            ))}
-          </div>
-        </motion.div>
-
-        {/* Content */}
-        <motion.div variants={fadeInUp} className="lg:col-span-3 space-y-6">
-          {/* Business Profile */}
-          {activeTab === "business" && (
-            <div className="bg-[#0F0F0F] rounded-2xl border border-white/10 p-6 space-y-5">
-              <div className="flex items-center gap-3 pb-4 border-b border-white/10">
-                <div className="w-10 h-10 bg-gradient-to-br from-red-600/20 to-amber-500/20 rounded-xl flex items-center justify-center">
-                  <Store size={20} className="text-amber-400" />
-                </div>
-                <div>
-                  <h2 className="font-bold">Business Profile</h2>
-                  <p className="text-xs text-gray-400">Your restaurant's basic information</p>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs text-gray-400 mb-2 font-semibold">Restaurant Logo</label>
-                <div className="flex items-center gap-4">
-                  <div
-                    className="w-20 h-20 rounded-2xl flex items-center justify-center text-3xl font-bold text-white transition-all duration-300"
-                    style={{ background: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})` }}
-                  >
-                    {businessName.charAt(0) || "S"}
-                  </div>
-                  <button className="bg-white/5 border border-white/10 px-4 py-2.5 rounded-xl text-sm font-semibold hover:bg-white/10 transition flex items-center gap-2">
-                    <Upload size={16} />
-                    Upload Logo
-                  </button>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs text-gray-400 mb-2 font-semibold">Restaurant Name</label>
-                  <input
-                    type="text"
-                    value={businessName}
-                    onChange={(e) => setBusinessName(e.target.value)}
-                    className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-sm focus:outline-none focus:border-red-600/50 transition"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-gray-400 mb-2 font-semibold">Slug (URL)</label>
-                  <input
-                    type="text"
-                    value={slug}
-                    onChange={(e) => setSlug(e.target.value)}
-                    className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-sm focus:outline-none focus:border-red-600/50 transition"
-                  />
-                </div>
-              </div>
-
-              {/* Live Preview */}
-              <div className="bg-white/5 rounded-2xl p-4">
-                <p className="text-xs text-gray-400 mb-3">Live Preview</p>
-                <div className="flex items-center gap-3">
-                  <div
-                    className="w-12 h-12 rounded-xl flex items-center justify-center font-bold text-white transition-all duration-300"
-                    style={{ background: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})` }}
-                  >
-                    {businessName.charAt(0) || "S"}
-                  </div>
-                  <div>
-                    <p className="font-bold">{businessName || "Restaurant Name"}</p>
-                    <p className="text-xs text-gray-400">menuflow.app/r/{slug || "slug"}</p>
-                  </div>
-                </div>
-              </div>
-            </div>
+          {saving ? (
+            <Loader2 size={18} className="animate-spin" />
+          ) : success ? (
+            <Check size={18} />
+          ) : (
+            <Save size={18} />
           )}
+          {saving ? 'Saving...' : success ? 'Saved!' : 'Save Changes'}
+        </motion.button>
+      </div>
 
-          {/* Branding */}
-          {activeTab === "branding" && (
-            <div className="bg-[#0F0F0F] rounded-2xl border border-white/10 p-6 space-y-5">
-              <div className="flex items-center gap-3 pb-4 border-b border-white/10">
-                <div className="w-10 h-10 bg-gradient-to-br from-red-600/20 to-amber-500/20 rounded-xl flex items-center justify-center">
-                  <Palette size={20} className="text-amber-400" />
-                </div>
-                <div>
-                  <h2 className="font-bold">Branding</h2>
-                  <p className="text-xs text-gray-400">Customize your restaurant's colors and style</p>
-                </div>
-              </div>
+      {error && (
+        <div className="mb-6 p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-600 text-sm">
+          {error}
+        </div>
+      )}
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs text-gray-400 mb-2 font-semibold">Primary Color</label>
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="color"
-                      value={primaryColor}
-                      onChange={(e) => setPrimaryColor(e.target.value)}
-                      className="w-12 h-12 rounded-xl bg-transparent cursor-pointer"
-                    />
-                    <input
-                      type="text"
-                      value={primaryColor}
-                      onChange={(e) => setPrimaryColor(e.target.value)}
-                      className="flex-1 bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-sm focus:outline-none focus:border-red-600/50 transition"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-xs text-gray-400 mb-2 font-semibold">Secondary Color</label>
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="color"
-                      value={secondaryColor}
-                      onChange={(e) => setSecondaryColor(e.target.value)}
-                      className="w-12 h-12 rounded-xl bg-transparent cursor-pointer"
-                    />
-                    <input
-                      type="text"
-                      value={secondaryColor}
-                      onChange={(e) => setSecondaryColor(e.target.value)}
-                      className="flex-1 bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-sm focus:outline-none focus:border-red-600/50 transition"
-                    />
-                  </div>
-                </div>
-              </div>
+      {success && (
+        <div className="mb-6 p-4 rounded-xl bg-green-500/10 border border-green-500/30 text-green-600 text-sm">
+          ✅ Settings saved successfully
+        </div>
+      )}
 
-              {/* Live Preview */}
-              <div className="bg-white/5 rounded-2xl p-4">
-                <p className="text-xs text-gray-400 mb-3">Live Preview</p>
-                <div className="flex items-center gap-3">
-                  <div
-                    className="w-12 h-12 rounded-xl flex items-center justify-center font-bold text-white transition-all duration-300"
-                    style={{ background: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})` }}
-                  >
-                    {businessName.charAt(0) || "S"}
-                  </div>
-                  <div>
-                    <p className="font-bold">{businessName || "Restaurant Name"}</p>
-                    <div
-                      className="mt-1 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold text-white"
-                      style={{ background: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})` }}
-                    >
-                      Branded
-                    </div>
-                  </div>
-                </div>
-              </div>
+      <div className="grid lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 space-y-6">
+          <Section icon={<Store size={18} />} title="Basic Information">
+            <Field label="Restaurant Name (EN) *">
+              <input
+                value={form.name}
+                onChange={(e) => update('name', e.target.value)}
+                className="input-clean"
+              />
+            </Field>
+            <Field label="Restaurant Name (AR)">
+              <input
+                value={form.name_ar}
+                onChange={(e) => update('name_ar', e.target.value)}
+                dir="rtl"
+                className="input-clean"
+              />
+            </Field>
+            <Field label="Description (EN)">
+              <textarea
+                value={form.description}
+                onChange={(e) => update('description', e.target.value)}
+                rows={3}
+                className="input-clean resize-none"
+              />
+            </Field>
+            <Field label="Description (AR)">
+              <textarea
+                value={form.description_ar}
+                onChange={(e) => update('description_ar', e.target.value)}
+                rows={3}
+                dir="rtl"
+                className="input-clean resize-none"
+              />
+            </Field>
+          </Section>
+
+          <Section icon={<Phone size={18} />} title="Contact">
+            <div className="grid md:grid-cols-2 gap-4">
+              <Field label="Phone">
+                <input
+                  value={form.phone}
+                  onChange={(e) => update('phone', e.target.value)}
+                  placeholder="+961 xx xxx xxx"
+                  className="input-clean"
+                />
+              </Field>
+              <Field label="City">
+                <input
+                  value={form.city}
+                  onChange={(e) => update('city', e.target.value)}
+                  className="input-clean"
+                />
+              </Field>
             </div>
-          )}
+            <Field label="Address">
+              <input
+                value={form.address}
+                onChange={(e) => update('address', e.target.value)}
+                className="input-clean"
+              />
+            </Field>
+          </Section>
 
-          {/* Working Hours */}
-          {activeTab === "hours" && (
-            <div className="bg-[#0F0F0F] rounded-2xl border border-white/10 p-6 space-y-5">
-              <div className="flex items-center gap-3 pb-4 border-b border-white/10">
-                <div className="w-10 h-10 bg-gradient-to-br from-red-600/20 to-amber-500/20 rounded-xl flex items-center justify-center">
-                  <Clock size={20} className="text-amber-400" />
-                </div>
-                <div>
-                  <h2 className="font-bold">Working Hours</h2>
-                  <p className="text-xs text-gray-400">Set your restaurant's opening hours</p>
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                {["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"].map((day) => (
-                  <div key={day} className="flex flex-wrap items-center gap-3 bg-white/5 rounded-xl p-3">
-                    <span className="w-24 text-sm font-semibold">{day}</span>
-                    <input
-                      type="time"
-                      defaultValue="10:00"
-                      className="bg-white/5 border border-white/10 rounded-lg py-2 px-3 text-sm focus:outline-none focus:border-red-600/50 transition"
-                    />
-                    <span className="text-gray-500 text-sm">to</span>
-                    <input
-                      type="time"
-                      defaultValue="22:00"
-                      className="bg-white/5 border border-white/10 rounded-lg py-2 px-3 text-sm focus:outline-none focus:border-red-600/50 transition"
-                    />
-                    <label className="flex items-center gap-2 ml-auto text-sm text-gray-400 cursor-pointer">
-                      <input type="checkbox" defaultChecked className="accent-amber-500" />
-                      Open
-                    </label>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Payments */}
-          {activeTab === "payments" && (
-            <div className="bg-[#0F0F0F] rounded-2xl border border-white/10 p-6 space-y-5">
-              <div className="flex items-center gap-3 pb-4 border-b border-white/10">
-                <div className="w-10 h-10 bg-gradient-to-br from-red-600/20 to-amber-500/20 rounded-xl flex items-center justify-center">
-                  <CreditCard size={20} className="text-amber-400" />
-                </div>
-                <div>
-                  <h2 className="font-bold">Payment Methods</h2>
-                  <p className="text-xs text-gray-400">Manage accepted payment options</p>
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                {[
-                  { key: "cash" as const, name: "Cash on Delivery", desc: "Accept cash payments" },
-                  { key: "whish" as const, name: "Whish Money", desc: "Lebanese digital wallet" },
-                  { key: "card" as const, name: "Credit Card", desc: "Visa, Mastercard" },
-                  { key: "omt" as const, name: "OMT", desc: "Lebanese money transfer" },
-                ].map((method) => (
-                  <button
-                    key={method.key}
-                    onClick={() => setPayments({ ...payments, [method.key]: !payments[method.key] })}
-                    className="w-full flex items-center justify-between bg-white/5 hover:bg-white/10 rounded-xl p-4 transition text-left"
-                  >
-                    <div>
-                      <p className="text-sm font-semibold">{method.name}</p>
-                      <p className="text-xs text-gray-400">{method.desc}</p>
-                    </div>
-                    <div className={`w-10 h-6 rounded-full transition relative ${payments[method.key] ? "bg-emerald-500" : "bg-gray-600"}`}>
-                      <div className={`w-4 h-4 bg-white rounded-full absolute top-1 transition-all ${payments[method.key] ? "left-5" : "left-1"}`}></div>
-                    </div>
-                  </button>
-                ))}
-              </div>
-
-              <div>
-                <label className="block text-xs text-gray-400 mb-2 font-semibold">Default Delivery Fee ($)</label>
+          <Section icon={<Truck size={18} />} title="Delivery & Pickup">
+            <div className="grid md:grid-cols-2 gap-4">
+              <Field label="Delivery Fee">
                 <input
                   type="number"
-                  value={deliveryFee}
-                  onChange={(e) => setDeliveryFee(Number(e.target.value))}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-sm focus:outline-none focus:border-red-600/50 transition"
+                  step="0.01"
+                  min="0"
+                  value={form.delivery_fee}
+                  onChange={(e) =>
+                    update('delivery_fee', parseFloat(e.target.value) || 0)
+                  }
+                  className="input-clean"
                 />
-              </div>
-            </div>
-          )}
-
-          {/* Notifications */}
-          {activeTab === "notifications" && (
-            <div className="bg-[#0F0F0F] rounded-2xl border border-white/10 p-6 space-y-5">
-              <div className="flex items-center gap-3 pb-4 border-b border-white/10">
-                <div className="w-10 h-10 bg-gradient-to-br from-red-600/20 to-amber-500/20 rounded-xl flex items-center justify-center">
-                  <Bell size={20} className="text-amber-400" />
-                </div>
-                <div>
-                  <h2 className="font-bold">Notifications</h2>
-                  <p className="text-xs text-gray-400">Choose how you receive alerts</p>
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                {[
-                  { key: "newOrders" as const, name: "New Orders", desc: "Get notified when a new order arrives" },
-                  { key: "cancelled" as const, name: "Cancelled Orders", desc: "When a customer cancels an order" },
-                  { key: "newCustomers" as const, name: "New Customers", desc: "When a new customer places an order" },
-                  { key: "dailySummary" as const, name: "Daily Summary", desc: "Receive a daily report at 11 PM" },
-                ].map((notif) => (
-                  <button
-                    key={notif.key}
-                    onClick={() => setNotifications({ ...notifications, [notif.key]: !notifications[notif.key] })}
-                    className="w-full flex items-center justify-between bg-white/5 hover:bg-white/10 rounded-xl p-4 transition text-left"
-                  >
-                    <div>
-                      <p className="text-sm font-semibold">{notif.name}</p>
-                      <p className="text-xs text-gray-400">{notif.desc}</p>
-                    </div>
-                    <div className={`w-10 h-6 rounded-full transition relative ${notifications[notif.key] ? "bg-emerald-500" : "bg-gray-600"}`}>
-                      <div className={`w-4 h-4 bg-white rounded-full absolute top-1 transition-all ${notifications[notif.key] ? "left-5" : "left-1"}`}></div>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* WhatsApp */}
-          {activeTab === "whatsapp" && (
-            <div className="bg-[#0F0F0F] rounded-2xl border border-white/10 p-6 space-y-5">
-              <div className="flex items-center gap-3 pb-4 border-b border-white/10">
-                <div className="w-10 h-10 bg-gradient-to-br from-red-600/20 to-amber-500/20 rounded-xl flex items-center justify-center">
-                  <MessageCircle size={20} className="text-amber-400" />
-                </div>
-                <div>
-                  <h2 className="font-bold">WhatsApp Integration</h2>
-                  <p className="text-xs text-gray-400">Connect your WhatsApp for order updates</p>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs text-gray-400 mb-2 font-semibold">WhatsApp Number</label>
+              </Field>
+              <Field label="Minimum Order">
                 <input
-                  type="tel"
-                  value={whatsapp}
-                  onChange={(e) => setWhatsapp(e.target.value)}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-sm focus:outline-none focus:border-red-600/50 transition"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={form.min_order}
+                  onChange={(e) =>
+                    update('min_order', parseFloat(e.target.value) || 0)
+                  }
+                  className="input-clean"
                 />
-              </div>
-
-              <div>
-                <label className="block text-xs text-gray-400 mb-2 font-semibold">Order Confirmation Message</label>
-                <textarea
-                  defaultValue="Thank you for your order! We'll contact you shortly."
-                  rows={3}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-sm focus:outline-none focus:border-red-600/50 transition resize-none"
-                />
-              </div>
-
-              <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-4">
-                <div className="flex items-center gap-2 mb-1">
-                  <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></div>
-                  <span className="text-sm font-semibold text-emerald-400">WhatsApp Connected</span>
-                </div>
-                <p className="text-xs text-emerald-400/70">Your restaurant will receive order notifications on WhatsApp</p>
-              </div>
+              </Field>
             </div>
-          )}
-        </motion.div>
+
+            <div className="space-y-1 pt-2">
+              <Toggle
+                label="Accept Delivery Orders"
+                checked={form.accepts_delivery}
+                onChange={(v) => update('accepts_delivery', v)}
+              />
+              <Toggle
+                label="Accept Pickup Orders"
+                checked={form.accepts_pickup}
+                onChange={(v) => update('accepts_pickup', v)}
+              />
+              <Toggle
+                label="Restaurant is Active"
+                hint="Inactive restaurants are hidden from customers"
+                checked={form.is_active}
+                onChange={(v) => update('is_active', v)}
+              />
+            </div>
+          </Section>
+
+          <Section icon={<DollarSign size={18} />} title="Currency">
+            <Field label="Menu Currency">
+              <select
+                value={form.currency}
+                onChange={(e) => update('currency', e.target.value)}
+                className="input-clean"
+              >
+                {CURRENCIES.map((c) => (
+                  <option key={c.code} value={c.code}>
+                    {c.label}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          </Section>
+        </div>
+
+        <div className="space-y-6">
+          <Section icon={<ImageIcon size={18} />} title="Logo">
+            <div className="flex flex-col items-center gap-4">
+              {form.logo_url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={form.logo_url}
+                  alt="Logo"
+                  className="w-28 h-28 rounded-2xl object-cover border border-line"
+                />
+              ) : (
+                <div className="w-28 h-28 rounded-2xl bg-cream border border-dashed border-line flex items-center justify-center">
+                  <ImageIcon size={28} className="text-ink-muted" />
+                </div>
+              )}
+              <label className="cursor-pointer text-sm px-4 py-2 rounded-lg bg-cream hover:bg-brand/10 transition text-ink font-medium">
+                {uploadingLogo ? 'Uploading...' : 'Upload Logo'}
+                <input
+                  type="file"
+                  accept="image/*"
+                  hidden
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) handleUpload(f, 'logo_url');
+                  }}
+                />
+              </label>
+            </div>
+          </Section>
+
+          <Section icon={<ImageIcon size={18} />} title="Cover">
+            <div className="flex flex-col items-center gap-4">
+              {form.cover_url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={form.cover_url}
+                  alt="Cover"
+                  className="w-full h-32 rounded-2xl object-cover border border-line"
+                />
+              ) : (
+                <div className="w-full h-32 rounded-2xl bg-cream border border-dashed border-line flex items-center justify-center">
+                  <ImageIcon size={28} className="text-ink-muted" />
+                </div>
+              )}
+              <label className="cursor-pointer text-sm px-4 py-2 rounded-lg bg-cream hover:bg-brand/10 transition text-ink font-medium">
+                {uploadingCover ? 'Uploading...' : 'Upload Cover'}
+                <input
+                  type="file"
+                  accept="image/*"
+                  hidden
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) handleUpload(f, 'cover_url');
+                  }}
+                />
+              </label>
+            </div>
+          </Section>
+
+          <Section icon={<LinkIcon size={18} />} title="Public URL">
+            <div className="text-sm">
+              <p className="text-ink-muted mb-2">Your menu is at:</p>
+              <code className="block p-3 rounded-lg bg-cream text-brand text-xs break-all">
+                /r/{restaurant.slug}
+              </code>
+              <p className="text-xs text-ink-muted/70 mt-2">
+                ⚠️ The URL slug cannot be changed here
+              </p>
+            </div>
+          </Section>
+        </div>
       </div>
+
+      <style jsx global>{`
+        .input-clean {
+          width: 100%;
+          background: white;
+          border: 1px solid #e5e1d8;
+          border-radius: 0.75rem;
+          padding: 0.75rem 1rem;
+          color: #1a1a1a;
+          font-size: 0.875rem;
+          outline: none;
+          transition: border-color 0.15s;
+        }
+        .input-clean::placeholder {
+          color: rgba(107, 114, 128, 0.5);
+        }
+        .input-clean:focus {
+          border-color: #1c7e84;
+          box-shadow: 0 0 0 3px rgba(28, 126, 132, 0.1);
+        }
+      `}</style>
+    </div>
+  );
+}
+
+function Section({
+  icon,
+  title,
+  children,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="bg-surface border border-line rounded-2xl p-5 md:p-6 shadow-soft"
+    >
+      <div className="flex items-center gap-2 mb-5">
+        <div className="w-8 h-8 rounded-lg bg-brand/10 border border-brand/20 flex items-center justify-center text-brand">
+          {icon}
+        </div>
+        <h2 className="font-semibold text-ink">{title}</h2>
+      </div>
+      <div className="space-y-4">{children}</div>
     </motion.div>
+  );
+}
+
+function Field({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <label className="text-xs font-medium text-ink-muted mb-1.5 block">
+        {label}
+      </label>
+      {children}
+    </div>
+  );
+}
+
+function Toggle({
+  label,
+  hint,
+  checked,
+  onChange,
+}: {
+  label: string;
+  hint?: string;
+  checked: boolean;
+  onChange: (v: boolean) => void;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-4 py-2">
+      <div>
+        <p className="text-sm text-ink">{label}</p>
+        {hint && <p className="text-xs text-ink-muted mt-0.5">{hint}</p>}
+      </div>
+      <button
+        type="button"
+        onClick={() => onChange(!checked)}
+        className={`relative w-12 h-7 rounded-full transition shrink-0 ${
+          checked ? 'bg-brand' : 'bg-line'
+        }`}
+      >
+        <span
+          className={`absolute top-0.5 w-6 h-6 rounded-full bg-white transition-all shadow ${
+            checked ? 'left-[22px]' : 'left-0.5'
+          }`}
+        />
+      </button>
+    </div>
   );
 }

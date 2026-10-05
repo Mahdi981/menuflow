@@ -1,396 +1,387 @@
-"use client";
+'use client';
 
-import { motion } from "framer-motion";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from 'react';
+import { motion } from 'framer-motion';
 import {
-  TrendingUp,
-  TrendingDown,
   DollarSign,
-  ShoppingCart,
+  ShoppingBag,
+  TrendingUp,
   Users,
-  Clock,
-  Star,
-  Flame,
-  ArrowUpRight,
-  Calendar,
-} from "lucide-react";
+  Loader2,
+  Trophy,
+  BarChart3,
+} from 'lucide-react';
 import {
   AreaChart,
   Area,
-  BarChart,
-  Bar,
   XAxis,
   YAxis,
-  CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-  LineChart,
-  Line,
-  RadialBarChart,
-  RadialBar,
-} from "recharts";
+  CartesianGrid,
+} from 'recharts';
+import { createClient } from '@/lib/supabase/client';
+import { useRestaurant } from '@/lib/hooks/useRestaurant';
 
-const periodOptions = ["7 Days", "30 Days", "90 Days"];
+const supabase = createClient();
 
-const metrics = {
-  "7 Days": [
-    { label: "Total Revenue", value: "$8,420", change: "+24.8%", isUp: true, icon: DollarSign, color: "emerald" },
-    { label: "Total Orders", value: "248", change: "+18.4%", isUp: true, icon: ShoppingCart, color: "amber" },
-    { label: "New Customers", value: "42", change: "+12.6%", isUp: true, icon: Users, color: "cyan" },
-    { label: "Avg Order Value", value: "$33.95", change: "-2.1%", isUp: false, icon: TrendingUp, color: "red" },
-  ],
-  "30 Days": [
-    { label: "Total Revenue", value: "$34,280", change: "+32.4%", isUp: true, icon: DollarSign, color: "emerald" },
-    { label: "Total Orders", value: "1,024", change: "+22.8%", isUp: true, icon: ShoppingCart, color: "amber" },
-    { label: "New Customers", value: "186", change: "+18.2%", isUp: true, icon: Users, color: "cyan" },
-    { label: "Avg Order Value", value: "$33.47", change: "+4.2%", isUp: true, icon: TrendingUp, color: "red" },
-  ],
-  "90 Days": [
-    { label: "Total Revenue", value: "$98,640", change: "+45.2%", isUp: true, icon: DollarSign, color: "emerald" },
-    { label: "Total Orders", value: "3,186", change: "+38.4%", isUp: true, icon: ShoppingCart, color: "amber" },
-    { label: "New Customers", value: "524", change: "+28.6%", isUp: true, icon: Users, color: "cyan" },
-    { label: "Avg Order Value", value: "$30.96", change: "-1.4%", isUp: false, icon: TrendingUp, color: "red" },
-  ],
+type OrderRow = {
+  id: string;
+  total: number;
+  customer_phone: string;
+  created_at: string;
+  status: string;
+  order_items: { product_name: string; quantity: number; total: number }[];
 };
 
-const revenueTrend = [
-  { day: "Mon", revenue: 420, orders: 18, customers: 14 },
-  { day: "Tue", revenue: 680, orders: 24, customers: 20 },
-  { day: "Wed", revenue: 520, orders: 20, customers: 16 },
-  { day: "Thu", revenue: 840, orders: 32, customers: 26 },
-  { day: "Fri", revenue: 1120, orders: 45, customers: 38 },
-  { day: "Sat", revenue: 1240, orders: 48, customers: 42 },
-  { day: "Sun", revenue: 980, orders: 38, customers: 30 },
-];
-
-const ordersByHour = [
-  { hour: "8AM", orders: 2 },
-  { hour: "10AM", orders: 5 },
-  { hour: "12PM", orders: 18 },
-  { hour: "2PM", orders: 22 },
-  { hour: "4PM", orders: 12 },
-  { hour: "6PM", orders: 28 },
-  { hour: "8PM", orders: 42 },
-  { hour: "10PM", orders: 24 },
-];
-
-const topProducts = [
-  { name: "Classic Burger", sales: 142, revenue: 710, growth: "+18%", image: "🍔" },
-  { name: "Cheese Pizza", sales: 98, revenue: 1176, growth: "+12%", image: "🍕" },
-  { name: "Fried Chicken", sales: 87, revenue: 609, growth: "+24%", image: "🍗" },
-  { name: "Coca Cola", sales: 156, revenue: 468, growth: "+8%", image: "🥤" },
-  { name: "Chocolate Cake", sales: 64, revenue: 256, growth: "+32%", image: "🍰" },
-];
-
-const categoryData = [
-  { name: "Burgers", value: 38, color: "#DC2626" },
-  { name: "Pizza", value: 24, color: "#F59E0B" },
-  { name: "Chicken", value: 18, color: "#06B6D4" },
-  { name: "Drinks", value: 12, color: "#10B981" },
-  { name: "Desserts", value: 8, color: "#8B5CF6" },
-];
-
-const customerRetention = [
-  { name: "Returning", value: 68, fill: "#DC2626" },
-  { name: "New", value: 32, fill: "#F59E0B" },
-];
-
-const fadeInUp = {
-  hidden: { opacity: 0, y: 30 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.4 } },
-};
-
-const stagger = {
-  hidden: { opacity: 0 },
-  visible: { opacity: 1, transition: { staggerChildren: 0.08 } },
-};
-
-const colorMap: Record<string, { bg: string; text: string }> = {
-  emerald: { bg: "bg-emerald-500/20", text: "text-emerald-400" },
-  amber: { bg: "bg-amber-500/20", text: "text-amber-400" },
-  cyan: { bg: "bg-cyan-500/20", text: "text-cyan-400" },
-  red: { bg: "bg-red-500/20", text: "text-red-400" },
-};
+type DateRange = '7d' | '30d' | '90d' | 'all';
 
 export default function AnalyticsPage() {
-  const [period, setPeriod] = useState<"7 Days" | "30 Days" | "90 Days">("7 Days");
-  const currentMetrics = metrics[period];
+  const { restaurant, loading: restaurantLoading } = useRestaurant();
+  const [orders, setOrders] = useState<OrderRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [range, setRange] = useState<DateRange>('30d');
+
+  useEffect(() => {
+    if (!restaurant?.id) return;
+    let cancelled = false;
+
+    const fetchOrders = async () => {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('orders')
+        .select(
+          'id, total, customer_phone, created_at, status, order_items(product_name, quantity, total)'
+        )
+        .eq('restaurant_id', restaurant.id)
+        .neq('status', 'cancelled')
+        .order('created_at', { ascending: false });
+
+      if (cancelled) return;
+      if (error) console.error(error);
+      else setOrders((data ?? []) as OrderRow[]);
+      setLoading(false);
+    };
+
+    fetchOrders();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [restaurant?.id]);
+
+  const filteredOrders = useMemo(() => {
+    if (range === 'all') return orders;
+    const days = range === '7d' ? 7 : range === '30d' ? 30 : 90;
+    const cutoff = Date.now() - days * 86400000;
+    return orders.filter((o) => new Date(o.created_at).getTime() >= cutoff);
+  }, [orders, range]);
+
+  const stats = useMemo(() => {
+    const revenue = filteredOrders.reduce(
+      (s, o) => s + (Number(o.total) || 0),
+      0
+    );
+    const count = filteredOrders.length;
+    const avg = count > 0 ? revenue / count : 0;
+    const uniqueCustomers = new Set(
+      filteredOrders.map((o) => o.customer_phone).filter(Boolean)
+    ).size;
+    return { revenue, count, avg, uniqueCustomers };
+  }, [filteredOrders]);
+
+  const chartData = useMemo(() => {
+    const days =
+      range === '7d' ? 7 : range === '30d' ? 30 : range === '90d' ? 90 : 30;
+    const now = new Date();
+    const buckets: Record<
+      string,
+      { label: string; revenue: number; orders: number }
+    > = {};
+
+    for (let i = days - 1; i >= 0; i--) {
+      const d = new Date(now);
+      d.setDate(d.getDate() - i);
+      const key = d.toISOString().split('T')[0];
+      const label = d.toLocaleDateString('en', {
+        month: 'short',
+        day: 'numeric',
+      });
+      buckets[key] = { label, revenue: 0, orders: 0 };
+    }
+
+    for (const o of filteredOrders) {
+      const key = new Date(o.created_at).toISOString().split('T')[0];
+      if (buckets[key]) {
+        buckets[key].revenue += Number(o.total) || 0;
+        buckets[key].orders += 1;
+      }
+    }
+
+    return Object.values(buckets);
+  }, [filteredOrders, range]);
+
+  const topProducts = useMemo(() => {
+    const map = new Map<string, { name: string; qty: number; revenue: number }>();
+    for (const o of filteredOrders) {
+      for (const item of o.order_items ?? []) {
+        const existing = map.get(item.product_name);
+        if (existing) {
+          existing.qty += item.quantity;
+          existing.revenue += Number(item.total) || 0;
+        } else {
+          map.set(item.product_name, {
+            name: item.product_name,
+            qty: item.quantity,
+            revenue: Number(item.total) || 0,
+          });
+        }
+      }
+    }
+    return Array.from(map.values())
+      .sort((a, b) => b.qty - a.qty)
+      .slice(0, 5);
+  }, [filteredOrders]);
+
+  if (restaurantLoading || loading) {
+    return (
+      <div className="min-h-screen bg-cream flex items-center justify-center">
+        <Loader2 size={32} className="animate-spin text-brand" />
+      </div>
+    );
+  }
+
+  if (!restaurant) {
+    return (
+      <div className="min-h-screen bg-cream p-8 text-center">
+        <p className="text-red-500">No restaurant found</p>
+      </div>
+    );
+  }
 
   return (
-    <motion.div initial="hidden" animate="visible" variants={stagger} className="space-y-6">
+    <div className="min-h-screen bg-cream p-4 md:p-6">
       {/* Header */}
-      <motion.div variants={fadeInUp} className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold">Analytics</h1>
-          <p className="text-sm text-gray-400">Deep insights into your restaurant performance</p>
+          <h1 className="text-2xl md:text-3xl font-bold text-ink">Analytics</h1>
+          <p className="text-sm text-ink-muted mt-1">
+            Track your restaurant performance
+          </p>
         </div>
-        <div className="flex items-center gap-2 bg-[#0F0F0F] rounded-xl p-1 border border-white/10">
-          {periodOptions.map((p) => (
+
+        <div className="flex gap-2">
+          {(
+            [
+              { key: '7d', label: '7 Days' },
+              { key: '30d', label: '30 Days' },
+              { key: '90d', label: '90 Days' },
+              { key: 'all', label: 'All Time' },
+            ] as const
+          ).map((f) => (
             <button
-              key={p}
-              onClick={() => setPeriod(p as typeof period)}
-              className={`px-4 py-2 rounded-lg text-xs font-semibold transition ${
-                period === p
-                  ? "bg-gradient-to-r from-red-600 to-amber-500 text-white"
-                  : "text-gray-400 hover:text-white"
+              key={f.key}
+              onClick={() => setRange(f.key)}
+              className={`px-3 py-2 rounded-xl text-xs md:text-sm font-medium transition ${
+                range === f.key
+                  ? 'bg-brand text-white shadow-brand'
+                  : 'bg-surface border border-line text-ink-muted hover:text-ink hover:border-brand/30'
               }`}
             >
-              {p}
+              {f.label}
             </button>
           ))}
         </div>
-      </motion.div>
-
-      {/* Metrics */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {currentMetrics.map((metric, i) => {
-          const colors = colorMap[metric.color];
-          return (
-            <motion.div
-              key={metric.label}
-              variants={fadeInUp}
-              whileHover={{ y: -4 }}
-              className="bg-[#0F0F0F] rounded-2xl p-5 border border-white/10 hover:border-amber-500/30 transition"
-            >
-              <div className="flex items-center justify-between mb-4">
-                <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${colors.bg}`}>
-                  <metric.icon size={20} className={colors.text} />
-                </div>
-                <span className={`text-xs font-semibold flex items-center gap-1 ${metric.isUp ? "text-emerald-400" : "text-red-400"}`}>
-                  {metric.isUp ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
-                  {metric.change}
-                </span>
-              </div>
-              <p className="text-xs text-gray-400 mb-1">{metric.label}</p>
-              <p className="text-2xl font-bold">{metric.value}</p>
-            </motion.div>
-          );
-        })}
       </div>
 
-      {/* Revenue + Orders Trend */}
-      <motion.div variants={fadeInUp} className="bg-[#0F0F0F] rounded-2xl p-5 border border-white/10">
-        <div className="flex items-center justify-between mb-5">
-          <div>
-            <h2 className="font-bold">Revenue & Orders Trend</h2>
-            <p className="text-xs text-gray-400">Performance over time</p>
+      {/* Stats */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-6">
+        <StatCard
+          icon={<DollarSign size={18} />}
+          label="Revenue"
+          value={`$${stats.revenue.toFixed(2)}`}
+          color="green"
+        />
+        <StatCard
+          icon={<ShoppingBag size={18} />}
+          label="Orders"
+          value={stats.count.toString()}
+          color="brand"
+        />
+        <StatCard
+          icon={<TrendingUp size={18} />}
+          label="Avg Order"
+          value={`$${stats.avg.toFixed(2)}`}
+          color="brand"
+        />
+        <StatCard
+          icon={<Users size={18} />}
+          label="Customers"
+          value={stats.uniqueCustomers.toString()}
+          color="amber"
+        />
+      </div>
+
+      {/* Chart */}
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="bg-surface border border-line rounded-2xl p-5 md:p-6 mb-6 shadow-soft"
+      >
+        <div className="flex items-center gap-2 mb-5">
+          <div className="w-8 h-8 rounded-lg bg-brand/10 flex items-center justify-center text-brand">
+            <BarChart3 size={18} />
           </div>
-          <div className="flex items-center gap-4 text-xs">
-            <div className="flex items-center gap-1.5">
-              <span className="w-3 h-3 rounded-full bg-red-600"></span>
-              <span className="text-gray-400">Revenue</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="w-3 h-3 rounded-full bg-amber-500"></span>
-              <span className="text-gray-400">Orders</span>
-            </div>
-          </div>
+          <h2 className="font-semibold text-ink">Sales Over Time</h2>
         </div>
-        <div className="w-full overflow-hidden">
-          <ResponsiveContainer width="100%" height={320}>
-            <AreaChart data={revenueTrend}>
+
+        <div className="h-64 w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={chartData}>
               <defs>
                 <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#DC2626" stopOpacity={0.8} />
-                  <stop offset="95%" stopColor="#DC2626" stopOpacity={0} />
-                </linearGradient>
-                <linearGradient id="colorOrders" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#F59E0B" stopOpacity={0.8} />
-                  <stop offset="95%" stopColor="#F59E0B" stopOpacity={0} />
+                  <stop offset="0%" stopColor="#1C7E84" stopOpacity={0.4} />
+                  <stop offset="100%" stopColor="#1C7E84" stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#1a1a1a" />
-              <XAxis dataKey="day" stroke="#666" fontSize={12} />
-              <YAxis stroke="#666" fontSize={12} />
+              <CartesianGrid strokeDasharray="3 3" stroke="#E5E1D8" />
+              <XAxis
+                dataKey="label"
+                stroke="#6B7280"
+                fontSize={11}
+                tickLine={false}
+                axisLine={false}
+              />
+              <YAxis
+                stroke="#6B7280"
+                fontSize={11}
+                tickLine={false}
+                axisLine={false}
+                tickFormatter={(v) => `$${v}`}
+              />
               <Tooltip
                 contentStyle={{
-                  backgroundColor: "#0F0F0F",
-                  border: "1px solid #333",
-                  borderRadius: "12px",
-                  fontSize: "12px",
+                  backgroundColor: '#FFFFFF',
+                  border: '1px solid #E5E1D8',
+                  borderRadius: '12px',
+                  fontSize: '12px',
+                  boxShadow: '0 4px 20px -5px rgba(0, 0, 0, 0.08)',
                 }}
+                formatter={(value: any) => [
+                  `$${Number(value).toFixed(2)}`,
+                  'Revenue',
+                ]}
               />
-              <Area type="monotone" dataKey="revenue" stroke="#DC2626" strokeWidth={2} fillOpacity={1} fill="url(#colorRevenue)" />
-              <Area type="monotone" dataKey="orders" stroke="#F59E0B" strokeWidth={2} fillOpacity={1} fill="url(#colorOrders)" />
+              <Area
+                type="monotone"
+                dataKey="revenue"
+                stroke="#1C7E84"
+                strokeWidth={2}
+                fill="url(#colorRevenue)"
+              />
             </AreaChart>
           </ResponsiveContainer>
         </div>
       </motion.div>
 
-      {/* Orders by Hour + Category */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <motion.div variants={fadeInUp} className="lg:col-span-2 bg-[#0F0F0F] rounded-2xl p-5 border border-white/10">
-          <div className="mb-5">
-            <h2 className="font-bold">Orders by Hour</h2>
-            <p className="text-xs text-gray-400">Busiest times of the day</p>
+      {/* Top Products */}
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.1 }}
+        className="bg-surface border border-line rounded-2xl p-5 md:p-6 shadow-soft"
+      >
+        <div className="flex items-center gap-2 mb-5">
+          <div className="w-8 h-8 rounded-lg bg-amber-custom/10 flex items-center justify-center text-amber-custom">
+            <Trophy size={18} />
           </div>
-          <div className="w-full overflow-hidden">
-            <ResponsiveContainer width="100%" height={280}>
-              <BarChart data={ordersByHour}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1a1a1a" />
-                <XAxis dataKey="hour" stroke="#666" fontSize={11} />
-                <YAxis stroke="#666" fontSize={12} />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: "#0F0F0F",
-                    border: "1px solid #333",
-                    borderRadius: "12px",
-                    fontSize: "12px",
-                  }}
-                />
-                <Bar dataKey="orders" fill="#F59E0B" radius={[8, 8, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </motion.div>
+          <h2 className="font-semibold text-ink">Top Products</h2>
+        </div>
 
-        <motion.div variants={fadeInUp} className="bg-[#0F0F0F] rounded-2xl p-5 border border-white/10">
-          <div className="mb-5">
-            <h2 className="font-bold">Sales by Category</h2>
-            <p className="text-xs text-gray-400">Category distribution</p>
-          </div>
-          <div className="w-full overflow-hidden">
-            <ResponsiveContainer width="100%" height={180}>
-              <PieChart>
-                <Pie
-                  data={categoryData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={45}
-                  outerRadius={75}
-                  paddingAngle={5}
-                  dataKey="value"
-                >
-                  {categoryData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: "#0F0F0F",
-                    border: "1px solid #333",
-                    borderRadius: "12px",
-                    fontSize: "12px",
-                  }}
-                />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-          <div className="space-y-2 mt-2">
-            {categoryData.map((cat) => (
-              <div key={cat.name} className="flex items-center justify-between text-xs">
-                <div className="flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: cat.color }}></span>
-                  <span className="text-gray-400">{cat.name}</span>
-                </div>
-                <span className="font-semibold">{cat.value}%</span>
-              </div>
-            ))}
-          </div>
-        </motion.div>
-      </div>
-
-      {/* Top Products + Customer Retention */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <motion.div variants={fadeInUp} className="lg:col-span-2 bg-[#0F0F0F] rounded-2xl border border-white/10 overflow-hidden">
-          <div className="p-5 border-b border-white/10 flex items-center justify-between">
-            <div>
-              <h2 className="font-bold">Top Products</h2>
-              <p className="text-xs text-gray-400">Best sellers by sales</p>
-            </div>
-            <button className="text-xs text-amber-400 hover:text-amber-300 font-semibold flex items-center gap-1">
-              View All
-              <ArrowUpRight size={12} />
-            </button>
-          </div>
-          <div className="p-3">
-            {topProducts.map((p, i) => (
-              <div key={p.name} className="flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 transition">
-                <div className="w-10 h-10 bg-gradient-to-br from-red-600/20 to-amber-500/20 rounded-xl flex items-center justify-center text-xl">
-                  {p.image}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold text-gray-500">#{i + 1}</span>
-                    <p className="text-sm font-semibold truncate">{p.name}</p>
+        {topProducts.length === 0 ? (
+          <p className="text-center text-ink-muted py-8 text-sm">
+            No product data yet
+          </p>
+        ) : (
+          <div className="space-y-3">
+            {topProducts.map((p, idx) => {
+              const maxQty = topProducts[0].qty;
+              const pct = maxQty > 0 ? (p.qty / maxQty) * 100 : 0;
+              return (
+                <div key={p.name} className="flex items-center gap-4">
+                  <div
+                    className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-sm shrink-0 ${
+                      idx === 0
+                        ? 'bg-amber-custom/20 text-amber-custom'
+                        : idx === 1
+                          ? 'bg-brand/10 text-brand'
+                          : idx === 2
+                            ? 'bg-brand/5 text-brand'
+                            : 'bg-cream text-ink-muted'
+                    }`}
+                  >
+                    #{idx + 1}
                   </div>
-                  <p className="text-xs text-gray-500">{p.sales} sales</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm font-bold text-amber-400">${p.revenue}</p>
-                  <p className="text-xs text-emerald-400">{p.growth}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </motion.div>
 
-        <motion.div variants={fadeInUp} className="bg-[#0F0F0F] rounded-2xl p-5 border border-white/10">
-          <div className="mb-5">
-            <h2 className="font-bold">Customer Retention</h2>
-            <p className="text-xs text-gray-400">Returning vs new</p>
-          </div>
-          <div className="w-full overflow-hidden">
-            <ResponsiveContainer width="100%" height={200}>
-              <RadialBarChart
-                cx="50%"
-                cy="50%"
-                innerRadius="30%"
-                outerRadius="100%"
-                data={customerRetention}
-                startAngle={90}
-                endAngle={-270}
-              >
-                <RadialBar dataKey="value" cornerRadius={10} background={{ fill: "#1a1a1a" }} />
-              </RadialBarChart>
-            </ResponsiveContainer>
-          </div>
-          <div className="space-y-3 mt-2">
-            {customerRetention.map((c) => (
-              <div key={c.name} className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="w-3 h-3 rounded-full" style={{ backgroundColor: c.fill }}></span>
-                  <span className="text-sm text-gray-400">{c.name}</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2 mb-1.5">
+                      <p className="text-sm font-medium truncate text-ink">
+                        {p.name}
+                      </p>
+                      <p className="text-xs text-ink-muted shrink-0">
+                        {p.qty} sold · ${p.revenue.toFixed(2)}
+                      </p>
+                    </div>
+                    <div className="h-1.5 bg-cream rounded-full overflow-hidden">
+                      <motion.div
+                        initial={{ width: 0 }}
+                        animate={{ width: `${pct}%` }}
+                        transition={{ duration: 0.6, delay: idx * 0.1 }}
+                        className="h-full bg-brand rounded-full"
+                      />
+                    </div>
+                  </div>
                 </div>
-                <span className="text-sm font-bold">{c.value}%</span>
-              </div>
-            ))}
+              );
+            })}
           </div>
-        </motion.div>
+        )}
+      </motion.div>
+    </div>
+  );
+}
+
+function StatCard({
+  icon,
+  label,
+  value,
+  color,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  color: 'brand' | 'amber' | 'green';
+}) {
+  const colors = {
+    brand: 'bg-brand/10 text-brand',
+    amber: 'bg-amber-custom/10 text-amber-custom',
+    green: 'bg-green-500/10 text-green-600',
+  };
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="bg-surface border border-line rounded-2xl p-4 shadow-soft"
+    >
+      <div
+        className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${colors[color]}`}
+      >
+        {icon}
       </div>
-
-      {/* Insights Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <motion.div variants={fadeInUp} className="bg-gradient-to-br from-red-600/10 to-transparent border border-red-600/30 rounded-2xl p-5">
-          <div className="w-10 h-10 bg-red-600/20 rounded-xl flex items-center justify-center mb-3">
-            <Flame size={20} className="text-red-400" />
-          </div>
-          <h3 className="font-bold mb-1">Peak Hours</h3>
-          <p className="text-sm text-gray-400 mb-2">8 PM - 10 PM</p>
-          <p className="text-xs text-red-400">+34% orders this period</p>
-        </motion.div>
-
-        <motion.div variants={fadeInUp} className="bg-gradient-to-br from-amber-500/10 to-transparent border border-amber-500/30 rounded-2xl p-5">
-          <div className="w-10 h-10 bg-amber-500/20 rounded-xl flex items-center justify-center mb-3">
-            <Star size={20} className="text-amber-400" />
-          </div>
-          <h3 className="font-bold mb-1">Top Rated</h3>
-          <p className="text-sm text-gray-400 mb-2">Cheese Pizza</p>
-          <p className="text-xs text-amber-400">4.9 ★ from 124 reviews</p>
-        </motion.div>
-
-        <motion.div variants={fadeInUp} className="bg-gradient-to-br from-emerald-500/10 to-transparent border border-emerald-500/30 rounded-2xl p-5">
-          <div className="w-10 h-10 bg-emerald-500/20 rounded-xl flex items-center justify-center mb-3">
-            <Clock size={20} className="text-emerald-400" />
-          </div>
-          <h3 className="font-bold mb-1">Avg Prep Time</h3>
-          <p className="text-sm text-gray-400 mb-2">18 minutes</p>
-          <p className="text-xs text-emerald-400">-2 min faster than last week</p>
-        </motion.div>
-      </div>
+      <p className="text-xs text-ink-muted uppercase tracking-wider">
+        {label}
+      </p>
+      <p className="text-xl font-bold text-ink mt-1 truncate">{value}</p>
     </motion.div>
   );
 }

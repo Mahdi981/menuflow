@@ -1,396 +1,343 @@
-"use client";
+'use client';
 
-import { motion, AnimatePresence } from "framer-motion";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from 'react';
+import { motion } from 'framer-motion';
 import {
-  Search,
   Users,
-  UserPlus,
-  Crown,
-  TrendingUp,
+  Search,
   Phone,
-  Mail,
-  MapPin,
-  MessageCircle,
-  Eye,
-  X,
-  ShoppingCart,
   DollarSign,
-  Calendar,
-} from "lucide-react";
+  TrendingUp,
+  Loader2,
+  Crown,
+  MapPin,
+} from 'lucide-react';
+import { createClient } from '@/lib/supabase/client';
+import { useRestaurant } from '@/lib/hooks/useRestaurant';
+
+const supabase = createClient();
+
+type OrderRow = {
+  id: string;
+  customer_name: string;
+  customer_phone: string;
+  total: number;
+  address: string | null;
+  created_at: string;
+  status: string;
+};
 
 type Customer = {
-  id: number;
-  name: string;
   phone: string;
-  email: string;
-  address: string;
-  totalOrders: number;
+  name: string;
+  address: string | null;
+  ordersCount: number;
   totalSpent: number;
-  lastOrder: string;
-  joinedDate: string;
-  status: "VIP" | "Regular" | "New";
+  lastOrderAt: string;
 };
 
-const initialCustomers: Customer[] = [
-  { id: 1, name: "Ahmad Ali", phone: "70 123 456", email: "ahmad@email.com", address: "Hamra, Beirut", totalOrders: 24, totalSpent: 456, lastOrder: "2 hours ago", joinedDate: "Jan 2026", status: "VIP" },
-  { id: 2, name: "Sarah Smith", phone: "71 234 567", email: "sarah@email.com", address: "Verdun, Beirut", totalOrders: 18, totalSpent: 342, lastOrder: "8 min ago", joinedDate: "Feb 2026", status: "VIP" },
-  { id: 3, name: "Omar Khaled", phone: "76 345 678", email: "omar@email.com", address: "Achrafieh, Beirut", totalOrders: 12, totalSpent: 234, lastOrder: "1 day ago", joinedDate: "Mar 2026", status: "Regular" },
-  { id: 4, name: "Layla Ahmad", phone: "78 456 789", email: "layla@email.com", address: "Jounieh", totalOrders: 8, totalSpent: 156, lastOrder: "2 days ago", joinedDate: "Apr 2026", status: "Regular" },
-  { id: 5, name: "Hassan Ali", phone: "79 567 890", email: "hassan@email.com", address: "Downtown, Beirut", totalOrders: 5, totalSpent: 98, lastOrder: "3 days ago", joinedDate: "May 2026", status: "Regular" },
-  { id: 6, name: "Nour Ibrahim", phone: "70 678 901", email: "nour@email.com", address: "Badaro, Beirut", totalOrders: 2, totalSpent: 34, lastOrder: "5 days ago", joinedDate: "Sep 2026", status: "New" },
-  { id: 7, name: "Maya Khalil", phone: "71 789 012", email: "maya@email.com", address: "Gemmayzeh, Beirut", totalOrders: 3, totalSpent: 56, lastOrder: "1 week ago", joinedDate: "Aug 2026", status: "New" },
-  { id: 8, name: "James Smith", phone: "76 890 123", email: "james@email.com", address: "Mar Mikhael, Beirut", totalOrders: 15, totalSpent: 289, lastOrder: "12 hours ago", joinedDate: "Feb 2026", status: "VIP" },
-];
-
-const statusConfig = {
-  VIP: { color: "text-amber-400", bg: "bg-amber-500/20", border: "border-amber-500/30", icon: Crown },
-  Regular: { color: "text-cyan-400", bg: "bg-cyan-500/20", border: "border-cyan-500/30", icon: Users },
-  New: { color: "text-emerald-400", bg: "bg-emerald-500/20", border: "border-emerald-500/30", icon: UserPlus },
-};
-
-const filters: ("All" | "VIP" | "Regular" | "New")[] = ["All", "VIP", "Regular", "New"];
-
-const fadeInUp = {
-  hidden: { opacity: 0, y: 30 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.4 } },
-};
-
-const stagger = {
-  hidden: { opacity: 0 },
-  visible: { opacity: 1, transition: { staggerChildren: 0.05 } },
-};
+type DateFilter = 'all' | '30d' | '7d';
 
 export default function CustomersPage() {
-  const [customers] = useState(initialCustomers);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"All" | "VIP" | "Regular" | "New">("All");
-  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const { restaurant, loading: restaurantLoading } = useRestaurant();
+  const [orders, setOrders] = useState<OrderRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [dateFilter, setDateFilter] = useState<DateFilter>('all');
 
-  const filteredCustomers = customers.filter((c) => {
-    const matchesSearch =
-      c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      c.phone.includes(searchTerm) ||
-      c.email.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === "All" || c.status === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
+  useEffect(() => {
+    if (!restaurant?.id) return;
+    let cancelled = false;
 
-  const totalSpent = customers.reduce((sum, c) => sum + c.totalSpent, 0);
-  const totalOrders = customers.reduce((sum, c) => sum + c.totalOrders, 0);
+    const fetchOrders = async () => {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('orders')
+        .select(
+          'id, customer_name, customer_phone, total, address, created_at, status'
+        )
+        .eq('restaurant_id', restaurant.id)
+        .neq('status', 'cancelled')
+        .order('created_at', { ascending: false });
 
-  const statusCounts = {
-    All: customers.length,
-    VIP: customers.filter((c) => c.status === "VIP").length,
-    Regular: customers.filter((c) => c.status === "Regular").length,
-    New: customers.filter((c) => c.status === "New").length,
-  };
+      if (cancelled) return;
+      if (error) console.error(error);
+      else setOrders((data ?? []) as OrderRow[]);
+      setLoading(false);
+    };
+
+    fetchOrders();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [restaurant?.id]);
+
+  const customers = useMemo<Customer[]>(() => {
+    const now = Date.now();
+    const cutoff =
+      dateFilter === '30d'
+        ? now - 30 * 86400000
+        : dateFilter === '7d'
+          ? now - 7 * 86400000
+          : 0;
+
+    const filtered = orders.filter(
+      (o) => new Date(o.created_at).getTime() >= cutoff
+    );
+
+    const map = new Map<string, Customer>();
+    for (const o of filtered) {
+      const phone = o.customer_phone.trim();
+      if (!phone) continue;
+
+      const existing = map.get(phone);
+      if (existing) {
+        existing.ordersCount += 1;
+        existing.totalSpent += Number(o.total) || 0;
+        if (new Date(o.created_at) > new Date(existing.lastOrderAt)) {
+          existing.lastOrderAt = o.created_at;
+          existing.name = o.customer_name;
+          if (o.address) existing.address = o.address;
+        }
+      } else {
+        map.set(phone, {
+          phone,
+          name: o.customer_name,
+          address: o.address,
+          ordersCount: 1,
+          totalSpent: Number(o.total) || 0,
+          lastOrderAt: o.created_at,
+        });
+      }
+    }
+
+    return Array.from(map.values()).sort(
+      (a, b) =>
+        new Date(b.lastOrderAt).getTime() - new Date(a.lastOrderAt).getTime()
+    );
+  }, [orders, dateFilter]);
+
+  const filteredCustomers = useMemo(() => {
+    const q = searchTerm.trim().toLowerCase();
+    if (!q) return customers;
+    return customers.filter(
+      (c) =>
+        c.name.toLowerCase().includes(q) || c.phone.toLowerCase().includes(q)
+    );
+  }, [customers, searchTerm]);
+
+  const stats = useMemo(() => {
+    const total = customers.length;
+    const repeat = customers.filter((c) => c.ordersCount > 1).length;
+    const revenue = customers.reduce((s, c) => s + c.totalSpent, 0);
+    const avg = total > 0 ? revenue / total : 0;
+    return { total, repeat, revenue, avg };
+  }, [customers]);
+
+  if (restaurantLoading || loading) {
+    return (
+      <div className="min-h-screen bg-cream flex items-center justify-center">
+        <Loader2 size={32} className="animate-spin text-brand" />
+      </div>
+    );
+  }
+
+  if (!restaurant) {
+    return (
+      <div className="min-h-screen bg-cream p-8 text-center">
+        <p className="text-red-500">No restaurant found</p>
+      </div>
+    );
+  }
 
   return (
-    <motion.div initial="hidden" animate="visible" variants={stagger} className="space-y-6">
+    <div className="min-h-screen bg-cream p-4 md:p-6">
       {/* Header */}
-      <motion.div variants={fadeInUp} className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold">Customers</h1>
-          <p className="text-sm text-gray-400">Manage your customer base</p>
-        </div>
-        <button className="bg-gradient-to-r from-red-600 to-amber-500 px-5 py-2.5 rounded-xl text-sm font-semibold hover:opacity-90 transition flex items-center justify-center gap-2">
-          <UserPlus size={16} />
-          Add Customer
-        </button>
-      </motion.div>
+      <div className="mb-6">
+        <h1 className="text-2xl md:text-3xl font-bold text-ink">Customers</h1>
+        <p className="text-sm text-ink-muted mt-1">
+          People who ordered from your restaurant
+        </p>
+      </div>
 
       {/* Stats */}
-      <motion.div variants={fadeInUp} className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-[#0F0F0F] rounded-2xl p-4 border border-white/10">
-          <div className="flex items-center justify-between mb-2">
-            <Users size={18} className="text-amber-400" />
-          </div>
-          <p className="text-xs text-gray-400 mb-1">Total Customers</p>
-          <p className="text-2xl font-bold">{customers.length}</p>
-        </div>
-        <div className="bg-[#0F0F0F] rounded-2xl p-4 border border-white/10">
-          <div className="flex items-center justify-between mb-2">
-            <Crown size={18} className="text-amber-400" />
-          </div>
-          <p className="text-xs text-gray-400 mb-1">VIP Customers</p>
-          <p className="text-2xl font-bold text-amber-400">{statusCounts.VIP}</p>
-        </div>
-        <div className="bg-[#0F0F0F] rounded-2xl p-4 border border-white/10">
-          <div className="flex items-center justify-between mb-2">
-            <ShoppingCart size={18} className="text-cyan-400" />
-          </div>
-          <p className="text-xs text-gray-400 mb-1">Total Orders</p>
-          <p className="text-2xl font-bold text-cyan-400">{totalOrders}</p>
-        </div>
-        <div className="bg-[#0F0F0F] rounded-2xl p-4 border border-white/10">
-          <div className="flex items-center justify-between mb-2">
-            <DollarSign size={18} className="text-emerald-400" />
-          </div>
-          <p className="text-xs text-gray-400 mb-1">Total Revenue</p>
-          <p className="text-2xl font-bold text-emerald-400">${totalSpent}</p>
-        </div>
-      </motion.div>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-6">
+        <StatCard
+          icon={<Users size={18} />}
+          label="Customers"
+          value={stats.total.toString()}
+          color="brand"
+        />
+        <StatCard
+          icon={<Crown size={18} />}
+          label="Repeat"
+          value={stats.repeat.toString()}
+          color="amber"
+        />
+        <StatCard
+          icon={<DollarSign size={18} />}
+          label="Revenue"
+          value={`$${stats.revenue.toFixed(0)}`}
+          color="green"
+        />
+        <StatCard
+          icon={<TrendingUp size={18} />}
+          label="Avg / Customer"
+          value={`$${stats.avg.toFixed(2)}`}
+          color="brand"
+        />
+      </div>
 
-      {/* Search + Filters */}
-      <motion.div variants={fadeInUp} className="bg-[#0F0F0F] rounded-2xl border border-white/10 p-4 space-y-4">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
+      {/* Filters */}
+      <div className="flex flex-col md:flex-row gap-3 mb-6">
+        <div className="relative flex-1">
+          <Search
+            size={18}
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-muted"
+          />
           <input
             type="text"
-            placeholder="Search by name, phone, or email..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full bg-white/5 border border-white/10 rounded-xl py-3 pl-10 pr-4 text-sm focus:outline-none focus:border-red-600/50 transition"
+            placeholder="Search by name or phone..."
+            className="w-full bg-surface border border-line rounded-xl py-3 pl-10 pr-4 text-sm text-ink placeholder:text-ink-muted/50 focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
           />
         </div>
-        <div className="flex gap-2 overflow-x-auto pb-1">
-          {filters.map((status) => (
+
+        <div className="flex gap-2">
+          {(
+            [
+              { key: 'all', label: 'All Time' },
+              { key: '30d', label: '30 Days' },
+              { key: '7d', label: '7 Days' },
+            ] as const
+          ).map((f) => (
             <button
-              key={status}
-              onClick={() => setStatusFilter(status)}
-              className={`px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition flex items-center gap-2 ${
-                statusFilter === status
-                  ? "bg-gradient-to-r from-red-600 to-amber-500 text-white"
-                  : "bg-white/5 text-gray-400 hover:bg-white/10"
+              key={f.key}
+              onClick={() => setDateFilter(f.key)}
+              className={`px-4 py-2.5 rounded-xl text-sm font-medium transition ${
+                dateFilter === f.key
+                  ? 'bg-brand text-white shadow-brand'
+                  : 'bg-surface border border-line text-ink-muted hover:text-ink hover:border-brand/30'
               }`}
             >
-              {status}
-              <span className={`px-1.5 py-0.5 rounded-full text-[10px] ${statusFilter === status ? "bg-white/20" : "bg-white/10"}`}>
-                {statusCounts[status]}
-              </span>
+              {f.label}
             </button>
           ))}
         </div>
-      </motion.div>
-
-      {/* Customers Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        <AnimatePresence mode="popLayout">
-          {filteredCustomers.length === 0 ? (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="col-span-full bg-[#0F0F0F] rounded-2xl border border-white/10 p-12 text-center"
-            >
-              <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Users size={24} className="text-gray-600" />
-              </div>
-              <p className="text-gray-400 mb-1">No customers found</p>
-              <p className="text-xs text-gray-600">Try adjusting your search or filters</p>
-            </motion.div>
-          ) : (
-            filteredCustomers.map((customer, i) => {
-              const config = statusConfig[customer.status];
-              const StatusIcon = config.icon;
-
-              return (
-                <motion.div
-                  key={customer.id}
-                  layout
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, scale: 0.9 }}
-                  transition={{ delay: i * 0.05 }}
-                  whileHover={{ y: -4 }}
-                  className="bg-[#0F0F0F] rounded-2xl border border-white/10 hover:border-amber-500/40 transition overflow-hidden"
-                >
-                  <div className="p-5">
-                    {/* Header */}
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 bg-gradient-to-br from-red-600 to-amber-500 rounded-xl flex items-center justify-center text-lg font-bold">
-                          {customer.name.charAt(0)}
-                        </div>
-                        <div className="min-w-0">
-                          <h3 className="font-bold text-sm truncate">{customer.name}</h3>
-                          <p className="text-xs text-gray-500">Joined {customer.joinedDate}</p>
-                        </div>
-                      </div>
-                      <div className={`px-2.5 py-1 rounded-full text-[10px] font-bold flex items-center gap-1 ${config.bg} ${config.color} ${config.border} border`}>
-                        <StatusIcon size={10} />
-                        {customer.status}
-                      </div>
-                    </div>
-
-                    {/* Contact Info */}
-                    <div className="space-y-2 mb-4">
-                      <div className="flex items-center gap-2 text-xs text-gray-400">
-                        <Phone size={12} className="text-amber-400 shrink-0" />
-                        <span className="truncate">{customer.phone}</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-xs text-gray-400">
-                        <Mail size={12} className="text-amber-400 shrink-0" />
-                        <span className="truncate">{customer.email}</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-xs text-gray-400">
-                        <MapPin size={12} className="text-amber-400 shrink-0" />
-                        <span className="truncate">{customer.address}</span>
-                      </div>
-                    </div>
-
-                    {/* Stats */}
-                    <div className="grid grid-cols-2 gap-2 mb-4 pt-4 border-t border-white/10">
-                      <div>
-                        <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-0.5">Orders</p>
-                        <p className="text-lg font-bold">{customer.totalOrders}</p>
-                      </div>
-                      <div>
-                        <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-0.5">Spent</p>
-                        <p className="text-lg font-bold text-amber-400">${customer.totalSpent}</p>
-                      </div>
-                    </div>
-
-                    {/* Last Order */}
-                    <div className="flex items-center gap-2 text-xs text-gray-500 mb-4">
-                      <Calendar size={12} />
-                      Last order: {customer.lastOrder}
-                    </div>
-
-                    {/* Actions */}
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => setSelectedCustomer(customer)}
-                        className="flex-1 bg-white/5 hover:bg-white/10 py-2 rounded-lg text-xs font-semibold text-gray-300 hover:text-white transition flex items-center justify-center gap-1"
-                      >
-                        <Eye size={14} />
-                        View Profile
-                      </button>
-                      <button className="p-2 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 transition" title="Message on WhatsApp">
-                        <MessageCircle size={14} />
-                      </button>
-                    </div>
-                  </div>
-                </motion.div>
-              );
-            })
-          )}
-        </AnimatePresence>
       </div>
 
-      {/* Customer Detail Modal */}
-      <AnimatePresence>
-        {selectedCustomer && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => setSelectedCustomer(null)}
-            className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-          >
+      {/* List */}
+      {filteredCustomers.length === 0 ? (
+        <div className="text-center py-16 bg-surface rounded-2xl border border-line shadow-soft">
+          <div className="w-16 h-16 rounded-2xl bg-brand/10 mx-auto flex items-center justify-center mb-4">
+            <Users size={28} className="text-brand" />
+          </div>
+          <p className="text-ink-muted font-medium">
+            {searchTerm ? 'No customers match your search' : 'No customers yet'}
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {filteredCustomers.map((customer, idx) => (
             <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              onClick={(e) => e.stopPropagation()}
-              className="bg-[#0F0F0F] rounded-3xl border border-white/10 w-full max-w-lg max-h-[90vh] overflow-y-auto"
+              key={customer.phone}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: Math.min(idx * 0.02, 0.3) }}
+              className="bg-surface border border-line rounded-2xl p-4 flex items-center gap-4 shadow-soft"
             >
-              {/* Header */}
-              <div className="p-5 border-b border-white/10 flex items-center justify-between sticky top-0 bg-[#0F0F0F] z-10">
-                <h2 className="text-lg font-bold">Customer Profile</h2>
-                <button
-                  onClick={() => setSelectedCustomer(null)}
-                  className="p-2 rounded-lg hover:bg-white/10 transition"
-                >
-                  <X size={18} />
-                </button>
+              <div className="w-12 h-12 rounded-full bg-brand flex items-center justify-center font-bold text-white shrink-0">
+                {customer.name.charAt(0).toUpperCase()}
               </div>
 
-              {/* Body */}
-              <div className="p-5 space-y-5">
-                {/* Profile Header */}
-                <div className="flex items-center gap-4">
-                  <div className="w-16 h-16 bg-gradient-to-br from-red-600 to-amber-500 rounded-2xl flex items-center justify-center text-2xl font-bold">
-                    {selectedCustomer.name.charAt(0)}
-                  </div>
-                  <div>
-                    <h3 className="text-xl font-bold">{selectedCustomer.name}</h3>
-                    <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold mt-1 ${statusConfig[selectedCustomer.status].bg} ${statusConfig[selectedCustomer.status].color} border ${statusConfig[selectedCustomer.status].border}`}>
-                      {selectedCustomer.status}
-                    </div>
-                  </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <p className="font-semibold text-ink truncate">
+                    {customer.name}
+                  </p>
+                  {customer.ordersCount >= 5 && (
+                    <Crown size={14} className="text-amber-custom shrink-0" />
+                  )}
                 </div>
-
-                {/* Contact Info */}
-                <div className="bg-white/5 rounded-2xl p-4 space-y-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 bg-amber-500/20 rounded-lg flex items-center justify-center">
-                      <Phone size={14} className="text-amber-400" />
-                    </div>
-                    <div>
-                      <p className="text-[10px] text-gray-500 uppercase tracking-wider">Phone</p>
-                      <p className="text-sm font-semibold">{selectedCustomer.phone}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 bg-amber-500/20 rounded-lg flex items-center justify-center">
-                      <Mail size={14} className="text-amber-400" />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-[10px] text-gray-500 uppercase tracking-wider">Email</p>
-                      <p className="text-sm font-semibold truncate">{selectedCustomer.email}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 bg-amber-500/20 rounded-lg flex items-center justify-center">
-                      <MapPin size={14} className="text-amber-400" />
-                    </div>
-                    <div>
-                      <p className="text-[10px] text-gray-500 uppercase tracking-wider">Address</p>
-                      <p className="text-sm font-semibold">{selectedCustomer.address}</p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Stats */}
-                <div className="grid grid-cols-3 gap-3">
-                  <div className="bg-white/5 rounded-2xl p-3 text-center">
-                    <ShoppingCart size={16} className="text-cyan-400 mx-auto mb-1" />
-                    <p className="text-[10px] text-gray-500 uppercase">Orders</p>
-                    <p className="text-lg font-bold">{selectedCustomer.totalOrders}</p>
-                  </div>
-                  <div className="bg-white/5 rounded-2xl p-3 text-center">
-                    <DollarSign size={16} className="text-emerald-400 mx-auto mb-1" />
-                    <p className="text-[10px] text-gray-500 uppercase">Spent</p>
-                    <p className="text-lg font-bold text-emerald-400">${selectedCustomer.totalSpent}</p>
-                  </div>
-                  <div className="bg-white/5 rounded-2xl p-3 text-center">
-                    <TrendingUp size={16} className="text-amber-400 mx-auto mb-1" />
-                    <p className="text-[10px] text-gray-500 uppercase">Avg</p>
-                    <p className="text-lg font-bold text-amber-400">
-                      ${Math.round(selectedCustomer.totalSpent / selectedCustomer.totalOrders)}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Info */}
-                <div className="bg-white/5 rounded-2xl p-4 space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-gray-400">Joined</span>
-                    <span className="font-semibold">{selectedCustomer.joinedDate}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-400">Last Order</span>
-                    <span className="font-semibold">{selectedCustomer.lastOrder}</span>
-                  </div>
-                </div>
-
-                {/* Actions */}
-                <div className="flex gap-2">
-                  <button className="flex-1 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 py-3 rounded-xl text-sm font-semibold transition flex items-center justify-center gap-2">
-                    <MessageCircle size={16} />
-                    WhatsApp
-                  </button>
-                  <button className="flex-1 bg-gradient-to-r from-red-600 to-amber-500 hover:opacity-90 py-3 rounded-xl text-sm font-semibold transition flex items-center justify-center gap-2">
-                    <ShoppingCart size={16} />
-                    New Order
-                  </button>
+                <div className="flex flex-wrap items-center gap-3 mt-1 text-xs text-ink-muted">
+                  <span className="flex items-center gap-1">
+                    <Phone size={11} /> {customer.phone}
+                  </span>
+                  {customer.address && (
+                    <span className="flex items-center gap-1 truncate max-w-[200px]">
+                      <MapPin size={11} /> {customer.address}
+                    </span>
+                  )}
                 </div>
               </div>
+
+              <div className="hidden md:flex items-center gap-6 text-right">
+                <div>
+                  <p className="text-xs text-ink-muted uppercase tracking-wider">
+                    Orders
+                  </p>
+                  <p className="font-bold text-sm text-ink">
+                    {customer.ordersCount}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-ink-muted uppercase tracking-wider">
+                    Spent
+                  </p>
+                  <p className="font-bold text-sm text-brand">
+                    ${customer.totalSpent.toFixed(2)}
+                  </p>
+                </div>
+              </div>
+
+              <a
+                href={`tel:${customer.phone}`}
+                className="p-2.5 rounded-xl bg-cream hover:bg-brand/10 hover:text-brand text-ink-muted transition shrink-0"
+                title="Call"
+              >
+                <Phone size={16} />
+              </a>
             </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function StatCard({
+  icon,
+  label,
+  value,
+  color,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  color: 'brand' | 'amber' | 'green';
+}) {
+  const colors = {
+    brand: 'bg-brand/10 text-brand',
+    amber: 'bg-amber-custom/10 text-amber-custom',
+    green: 'bg-green-500/10 text-green-600',
+  };
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="bg-surface border border-line rounded-2xl p-4 shadow-soft"
+    >
+      <div
+        className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${colors[color]}`}
+      >
+        {icon}
+      </div>
+      <p className="text-xs text-ink-muted uppercase tracking-wider">
+        {label}
+      </p>
+      <p className="text-xl font-bold text-ink mt-1">{value}</p>
     </motion.div>
   );
 }
