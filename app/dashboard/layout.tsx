@@ -1,15 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import Sidebar from '@/components/dashboard/sidebar';
+import Sidebar from '@/components/dashboard/Sidebar';
 import TopBar from '@/components/dashboard/TopBar';
-
-type SidebarProps = {
-  isMobileOpen: boolean;
-  onMobileClose: () => void;
-  isCollapsed: boolean;
-  onToggleCollapse: () => void;
-};
 
 export default function DashboardLayout({
   children,
@@ -18,7 +11,6 @@ export default function DashboardLayout({
 }) {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const DashboardSidebar = Sidebar as React.ComponentType<SidebarProps>;
 
   // إغلاق الـ sidebar تلقائياً عند تغيير حجم الشاشة
   useEffect(() => {
@@ -47,7 +39,7 @@ export default function DashboardLayout({
   return (
     <div className="flex min-h-screen bg-cream">
       {/* Sidebar */}
-      <DashboardSidebar
+      <Sidebar
         isMobileOpen={isMobileOpen}
         onMobileClose={() => setIsMobileOpen(false)}
         isCollapsed={isCollapsed}
