@@ -1,31 +1,34 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
-import { createClient } from "@/lib/supabase/client";
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { motion } from 'framer-motion';
+import { createClient } from '@/lib/supabase/client';
 import {
-  UtensilsCrossed,
+  ChefHat,
   Store,
   Phone,
   MapPin,
   ArrowRight,
   AlertCircle,
-} from "lucide-react";
+} from 'lucide-react';
 
 export default function SetupPage() {
   const router = useRouter();
-  const supabase = createClient();
-  const [name, setName] = useState("");
-  const [slug, setSlug] = useState("");
-  const [phone, setPhone] = useState("");
-  const [address, setAddress] = useState("");
+
+  // ✅ الحل: lazy init
+  const [supabase] = useState(() => createClient());
+
+  const [name, setName] = useState('');
+  const [slug, setSlug] = useState('');
+  const [phone, setPhone] = useState('');
+  const [address, setAddress] = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError("");
+    setError('');
     setLoading(true);
 
     try {
@@ -33,58 +36,67 @@ export default function SetupPage() {
       const {
         data: { user },
       } = await supabase.auth.getUser();
-      if (!user) throw new Error("Not authenticated");
+      if (!user) throw new Error('يجب تسجيل الدخول');
 
-      // 2. أنشئ المطعم عبر API Route (service role)
-      const res = await fetch("/api/restaurants", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+      // 2. اختَر الخطة من localStorage (إذا جاء من /pricing)
+      const selectedPlan =
+        (typeof window !== 'undefined' &&
+          localStorage.getItem('menuflow_selected_plan')) ||
+        'starter';
+
+      // 3. أنشئ المطعم عبر API Route
+      const res = await fetch('/api/restaurants', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name,
           slug,
           phone,
           address,
+          plan: selectedPlan,
         }),
       });
 
       const json = await res.json();
 
       if (!res.ok) {
-        throw new Error(json.error ?? "Failed to create restaurant");
+        throw new Error(json.error ?? 'فشل إنشاء المطعم');
       }
 
       const restaurant = json.restaurant;
 
-      // 3. أنشئ الاشتراك (لو الجدول موجود، وإلا تجاهل الخطأ)
+      // 4. أنشئ الاشتراك (نفس المنطق)
       try {
-        await supabase.from("subscriptions").insert({
+        await supabase.from('subscriptions').insert({
           restaurant_id: restaurant.id,
-          plan: "starter",
-          status: "active",
-          max_orders: 5,
-          max_products: 10,
-          max_categories: 1,
+          plan: selectedPlan,
+          status: 'active',
           order_count: 0,
         });
       } catch (subErr) {
-        // نتجاهل خطأ الاشتراك — مش حرج
-        console.warn("Subscription insert skipped:", subErr);
+        console.warn('Subscription insert skipped:', subErr);
       }
 
-      router.push("/dashboard");
+      // 5. احذف الخطة من localStorage
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('menuflow_selected_plan');
+      }
+
+      router.push('/dashboard');
       router.refresh();
     } catch (err: any) {
-      setError(err.message || "حدث خطأ");
+      setError(err.message || 'حدث خطأ');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <main className="min-h-screen bg-[#0A0A0A] text-white flex items-center justify-center p-4">
-      <div className="fixed inset-0 -z-10 overflow-hidden">
-        <div className="absolute top-0 -left-40 w-96 h-96 bg-red-600/20 rounded-full blur-3xl"></div>
-        <div className="absolute bottom-0 -right-40 w-96 h-96 bg-amber-500/20 rounded-full blur-3xl"></div>
+    <main className="min-h-screen bg-cream flex items-center justify-center p-4">
+      {/* Decorative gradients */}
+      <div className="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
+        <div className="absolute top-0 -left-40 w-96 h-96 bg-brand/10 rounded-full blur-3xl"></div>
+        <div className="absolute bottom-0 -right-40 w-96 h-96 bg-amber-custom/10 rounded-full blur-3xl"></div>
       </div>
 
       <motion.div
@@ -92,30 +104,40 @@ export default function SetupPage() {
         animate={{ opacity: 1, y: 0 }}
         className="w-full max-w-lg"
       >
+        {/* Header */}
         <div className="text-center mb-8">
-          <div className="w-12 h-12 bg-gradient-to-br from-red-600 to-amber-500 rounded-xl flex items-center justify-center mx-auto mb-4">
-            <UtensilsCrossed size={24} className="text-white" />
+          <div className="w-14 h-14 bg-gradient-to-br from-brand to-brand-dark rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-brand">
+            <ChefHat size={28} className="text-white" />
           </div>
-          <h1 className="text-3xl font-bold mb-2">Setup your restaurant</h1>
-          <p className="text-gray-400 text-sm">Tell us about your business</p>
+          <h1 className="text-3xl font-bold text-ink mb-2">
+            أهلاً بمطعمك 👋
+          </h1>
+          <p className="text-sm text-ink-muted">
+            عرّفنا شوي عن مطعمك
+          </p>
         </div>
 
-        <div className="bg-[#0F0F0F] rounded-3xl border border-white/10 p-6 md:p-8">
+        {/* Card */}
+        <div className="bg-surface rounded-3xl border border-line p-6 md:p-8 shadow-soft">
           {error && (
             <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-3 mb-4 flex items-start gap-2">
-              <AlertCircle size={16} className="text-red-400 shrink-0 mt-0.5" />
-              <p className="text-xs text-red-400">{error}</p>
+              <AlertCircle
+                size={16}
+                className="text-red-600 shrink-0 mt-0.5"
+              />
+              <p className="text-xs text-red-600">{error}</p>
             </div>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Restaurant Name */}
             <div>
-              <label className="block text-xs text-gray-400 mb-2 font-semibold">
-                Restaurant Name *
+              <label className="block text-xs font-semibold text-ink-muted mb-2">
+                اسم المطعم *
               </label>
               <div className="relative">
                 <Store
-                  className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-muted"
                   size={18}
                 />
                 <input
@@ -126,48 +148,50 @@ export default function SetupPage() {
                     setSlug(
                       e.target.value
                         .toLowerCase()
-                        .replace(/\s+/g, "-")
-                        .replace(/[^a-z0-9-]/g, "")
+                        .replace(/\s+/g, '-')
+                        .replace(/[^a-z0-9-]/g, '')
                     );
                   }}
-                  placeholder="Your Restaurant"
+                  placeholder="مطعمي"
                   required
-                  className="w-full bg-white/5 border border-white/10 rounded-xl py-3 pl-10 pr-4 text-sm focus:outline-none focus:border-red-600/50 transition"
+                  className="w-full bg-white border border-line rounded-xl py-3 pl-10 pr-4 text-sm text-ink placeholder:text-ink-muted/50 focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 transition"
                 />
               </div>
             </div>
 
+            {/* URL Slug */}
             <div>
-              <label className="block text-xs text-gray-400 mb-2 font-semibold">
-                URL Slug *
+              <label className="block text-xs font-semibold text-ink-muted mb-2">
+                رابط المنيو *
               </label>
-              <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-xl px-3">
-                <span className="text-xs text-gray-500 shrink-0">/r/</span>
+              <div className="flex items-center gap-2 bg-white border border-line rounded-xl px-3 focus-within:border-brand focus-within:ring-2 focus-within:ring-brand/20 transition">
+                <span className="text-xs text-ink-muted shrink-0">/r/</span>
                 <input
                   type="text"
                   value={slug}
                   onChange={(e) =>
                     setSlug(
-                      e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "")
+                      e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '')
                     )
                   }
-                  placeholder="snack"
+                  placeholder="my-restaurant"
                   required
-                  className="flex-1 bg-transparent py-3 text-sm focus:outline-none"
+                  className="flex-1 bg-transparent py-3 text-sm text-ink placeholder:text-ink-muted/50 focus:outline-none"
                 />
               </div>
-              <p className="text-[10px] text-gray-500 mt-1">
-                Your menu will be at: /r/{slug || "your-slug"}
+              <p className="text-[10px] text-ink-muted mt-1">
+                رابط منيوك: /r/{slug || 'my-restaurant'}
               </p>
             </div>
 
+            {/* Phone */}
             <div>
-              <label className="block text-xs text-gray-400 mb-2 font-semibold">
-                Phone
+              <label className="block text-xs font-semibold text-ink-muted mb-2">
+                الهاتف
               </label>
               <div className="relative">
                 <Phone
-                  className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-muted"
                   size={18}
                 />
                 <input
@@ -175,37 +199,48 @@ export default function SetupPage() {
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
                   placeholder="+961 70 053 406"
-                  className="w-full bg-white/5 border border-white/10 rounded-xl py-3 pl-10 pr-4 text-sm focus:outline-none focus:border-red-600/50 transition"
+                  className="w-full bg-white border border-line rounded-xl py-3 pl-10 pr-4 text-sm text-ink placeholder:text-ink-muted/50 focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 transition"
                 />
               </div>
             </div>
 
+            {/* Address */}
             <div>
-              <label className="block text-xs text-gray-400 mb-2 font-semibold">
-                Address
+              <label className="block text-xs font-semibold text-ink-muted mb-2">
+                العنوان
               </label>
               <div className="relative">
                 <MapPin
-                  className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-muted"
                   size={18}
                 />
                 <input
                   type="text"
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
-                  placeholder="Your City"
-                  className="w-full bg-white/5 border border-white/10 rounded-xl py-3 pl-10 pr-4 text-sm focus:outline-none focus:border-red-600/50 transition"
+                  placeholder="المدينة"
+                  className="w-full bg-white border border-line rounded-xl py-3 pl-10 pr-4 text-sm text-ink placeholder:text-ink-muted/50 focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 transition"
                 />
               </div>
             </div>
 
+            {/* Submit */}
             <button
               type="submit"
               disabled={loading || !name || !slug}
-              className="w-full bg-gradient-to-r from-red-600 to-amber-500 py-3.5 rounded-xl font-semibold hover:opacity-90 transition disabled:opacity-50 flex items-center justify-center gap-2"
+              className="w-full bg-brand hover:bg-brand-dark py-3.5 rounded-xl font-semibold text-white shadow-brand transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
-              {loading ? "Creating..." : "Create Restaurant"}
-              {!loading && <ArrowRight size={18} />}
+              {loading ? (
+                <>
+                  <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  جاري الإنشاء...
+                </>
+              ) : (
+                <>
+                  إنشاء المطعم
+                  <ArrowRight size={18} />
+                </>
+              )}
             </button>
           </form>
         </div>

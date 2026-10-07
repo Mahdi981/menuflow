@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
@@ -15,10 +15,12 @@ import {
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 
-const supabase = createClient();
-
-export default function ResetPasswordPage() {
+function ResetPasswordForm() {
   const router = useRouter();
+
+  // ✅ الحل: lazy init
+  const [supabase] = useState(() => createClient());
+
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -28,30 +30,28 @@ export default function ResetPasswordPage() {
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
-    // Supabase بيعمل session مؤقتة من الرابط
     const checkSession = async () => {
       const { data } = await supabase.auth.getSession();
       if (data.session) {
         setIsReady(true);
       } else {
-        setError('Invalid or expired reset link. Please request a new one.');
+        setError('رابط إعادة التعيين غير صالح أو منتهي. الرجاء طلب رابط جديد.');
       }
     };
-
     checkSession();
-  }, []);
+  }, [supabase]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
     if (password.length < 6) {
-      setError('Password must be at least 6 characters');
+      setError('كلمة المرور يجب أن تكون 6 أحرف على الأقل');
       return;
     }
 
     if (password !== confirmPassword) {
-      setError('Passwords do not match');
+      setError('كلمتا المرور غير متطابقتين');
       return;
     }
 
@@ -65,11 +65,9 @@ export default function ResetPasswordPage() {
       if (updateError) throw updateError;
 
       setSuccess(true);
-      setTimeout(() => {
-        router.push('/auth/login');
-      }, 2500);
+      setTimeout(() => router.push('/auth/login'), 2500);
     } catch (err: any) {
-      setError(err.message ?? 'Failed to reset password');
+      setError(err.message ?? 'فشل تحديث كلمة المرور');
     } finally {
       setLoading(false);
     }
@@ -82,21 +80,15 @@ export default function ResetPasswordPage() {
         animate={{ opacity: 1, y: 0 }}
         className="w-full max-w-md"
       >
-        {/* Logo */}
-        <Link
-          href="/"
-          className="flex items-center justify-center gap-2 mb-8"
-        >
+        <Link href="/" className="flex items-center justify-center gap-2 mb-8">
           <div className="w-10 h-10 rounded-xl bg-brand flex items-center justify-center">
             <ChefHat size={20} className="text-white" />
           </div>
           <span className="font-bold text-2xl text-ink">MenuFlow</span>
         </Link>
 
-        {/* Card */}
         <div className="bg-surface border border-line rounded-3xl p-6 md:p-8 shadow-soft">
           {success ? (
-            /* ============ SUCCESS ============ */
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -106,37 +98,31 @@ export default function ResetPasswordPage() {
                 <Check size={32} className="text-green-600" strokeWidth={3} />
               </div>
               <h1 className="text-2xl font-bold text-ink mb-2">
-                Password updated!
+                تم تحديث كلمة المرور!
               </h1>
               <p className="text-sm text-ink-muted mb-4">
-                Redirecting you to sign in...
+                جاري التحويل لتسجيل الدخول...
               </p>
               <Loader2 size={20} className="animate-spin text-brand mx-auto" />
             </motion.div>
           ) : !isReady ? (
-            /* ============ LOADING ============ */
             <div className="text-center py-8">
               <Loader2 size={32} className="animate-spin text-brand mx-auto mb-4" />
-              <p className="text-sm text-ink-muted">
-                Verifying reset link...
-              </p>
+              <p className="text-sm text-ink-muted">جاري التحقق من الرابط...</p>
             </div>
           ) : (
-            /* ============ FORM ============ */
             <>
               <div className="text-center mb-6">
-                <h1 className="text-2xl font-bold text-ink">
-                  New password
-                </h1>
+                <h1 className="text-2xl font-bold text-ink">كلمة مرور جديدة</h1>
                 <p className="text-sm text-ink-muted mt-1">
-                  Enter your new password below
+                  أدخل كلمة المرور الجديدة
                 </p>
               </div>
 
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
                   <label className="text-sm font-medium text-ink mb-1.5 block">
-                    New Password
+                    كلمة المرور الجديدة
                   </label>
                   <div className="relative">
                     <Lock
@@ -147,7 +133,7 @@ export default function ResetPasswordPage() {
                       type={showPassword ? 'text' : 'password'}
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      placeholder="At least 6 characters"
+                      placeholder="6 أحرف على الأقل"
                       required
                       minLength={6}
                       className="w-full bg-white border border-line rounded-xl pl-10 pr-10 py-3 text-sm text-ink placeholder:text-ink-muted/50 focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
@@ -164,7 +150,7 @@ export default function ResetPasswordPage() {
 
                 <div>
                   <label className="text-sm font-medium text-ink mb-1.5 block">
-                    Confirm Password
+                    تأكيد كلمة المرور
                   </label>
                   <div className="relative">
                     <Lock
@@ -175,7 +161,7 @@ export default function ResetPasswordPage() {
                       type={showPassword ? 'text' : 'password'}
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
-                      placeholder="Re-enter password"
+                      placeholder="أعد كتابة كلمة المرور"
                       required
                       minLength={6}
                       className="w-full bg-white border border-line rounded-xl pl-10 pr-4 py-3 text-sm text-ink placeholder:text-ink-muted/50 focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
@@ -198,10 +184,10 @@ export default function ResetPasswordPage() {
                   {loading ? (
                     <>
                       <Loader2 size={18} className="animate-spin" />
-                      Updating...
+                      جاري التحديث...
                     </>
                   ) : (
-                    'Update Password'
+                    'تحديث كلمة المرور'
                   )}
                 </button>
               </form>
@@ -210,5 +196,19 @@ export default function ResetPasswordPage() {
         </div>
       </motion.div>
     </div>
+  );
+}
+
+export default function ResetPasswordPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-cream flex items-center justify-center">
+          <Loader2 size={32} className="animate-spin text-brand" />
+        </div>
+      }
+    >
+      <ResetPasswordForm />
+    </Suspense>
   );
 }
