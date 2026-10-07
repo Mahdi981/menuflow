@@ -13,6 +13,7 @@ import {
   Truck,
   Store,
   ShoppingBag,
+  ExternalLink,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useRestaurant } from '@/lib/hooks/useRestaurant';
@@ -52,6 +53,11 @@ type Order = {
   total: number;
   status: OrderStatus;
   created_at: string;
+  // ⬇️ جديد
+  latitude?: number | null;
+  longitude?: number | null;
+  location_type?: string | null;
+  location_label?: string | null;
   order_items?: OrderItem[];
 };
 
@@ -335,6 +341,7 @@ export default function OrdersPage() {
 
                 {/* Body */}
                 <div className="grid md:grid-cols-3 gap-3 mb-4">
+                  {/* Customer */}
                   <div className="bg-cream rounded-xl p-3">
                     <p className="text-xs text-ink-muted uppercase tracking-wider mb-1">
                       Customer
@@ -347,6 +354,7 @@ export default function OrdersPage() {
                     </p>
                   </div>
 
+                  {/* Items */}
                   <div className="bg-cream rounded-xl p-3">
                     <p className="text-xs text-ink-muted uppercase tracking-wider mb-1">
                       Items
@@ -364,13 +372,30 @@ export default function OrdersPage() {
                     </div>
                   </div>
 
+                  {/* ⬇️ Address / Location (جديد) */}
                   <div className="bg-cream rounded-xl p-3">
                     {order.address ? (
                       <>
                         <p className="text-xs text-ink-muted uppercase tracking-wider mb-1 flex items-center gap-1">
-                          <MapPin size={11} /> Address
+                          <MapPin size={11} />
+                          {order.location_type === 'map'
+                            ? 'Location'
+                            : 'Address'}
                         </p>
-                        <p className="text-xs text-ink">{order.address}</p>
+                        <p className="text-xs text-ink line-clamp-2 leading-relaxed">
+                          {order.address}
+                        </p>
+                        {order.latitude && order.longitude && (
+                          <a
+                            href={`https://www.google.com/maps?q=${order.latitude},${order.longitude}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-xs text-brand font-semibold mt-2 hover:underline"
+                          >
+                            <ExternalLink size={11} />
+                            فتح في Google Maps
+                          </a>
+                        )}
                       </>
                     ) : (
                       <>

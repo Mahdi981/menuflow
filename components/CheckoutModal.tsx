@@ -7,6 +7,7 @@ import type { Restaurant, OrderType } from '@/lib/types/menu';
 import { useCart } from '@/lib/store/cart';
 import { createClient } from '@/lib/supabase/client';
 import { formatCurrency } from '@/lib/utils/formatCurrency';
+import LocationPicker, { type LocationData } from './LocationPicker';
 
 const supabase = createClient();
 
@@ -54,7 +55,12 @@ export default function CheckoutModal({
   const [orderType, setOrderType] = useState<OrderType>(
     restaurant.accepts_delivery ? 'delivery' : 'pickup'
   );
-  const [address, setAddress] = useState('');
+
+  // ⬇️ استبدل address القديم بـ location
+  const [location, setLocation] = useState<LocationData>({
+    type: 'map',
+  });
+
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -64,7 +70,6 @@ export default function CheckoutModal({
   const [appliedOffer, setAppliedOffer] = useState<Offer | null>(null);
   const [couponError, setCouponError] = useState<string | null>(null);
 
-  // Success state
   const [orderResult, setOrderResult] = useState<OrderResult | null>(null);
 
   const sub = subtotal();
@@ -78,13 +83,9 @@ export default function CheckoutModal({
 
   const total = Math.max(0, sub - discountAmount + deliveryFee);
 
-  // ========== Lebanese Phone Validation ==========
-  // Valid: 3xxxxxxx, 70xxxxxx, 71xxxxxx, 76xxxxxx, 78xxxxxx, 79xxxxxx, 81xxxxxx
   const validateLebanesePhone = (p: string): boolean => {
     const cleaned = p.replace(/\D/g, '');
-    // Must be 7 or 8 digits
     if (cleaned.length !== 7 && cleaned.length !== 8) return false;
-    // Must start with valid Lebanese prefixes
     return /^(3|70|71|76|78|79|81)/.test(cleaned);
   };
 
@@ -93,7 +94,6 @@ export default function CheckoutModal({
     return `+961${cleaned}`;
   };
 
-  // ========== Apply Coupon ==========
   const applyCoupon = async () => {
     const code = couponCode.trim().toUpperCase();
     if (!code) return;
@@ -145,103 +145,100 @@ export default function CheckoutModal({
     setCouponError(null);
   };
 
-  // ========== Build WhatsApp Message ==========
-  const buildWhatsAppMessage = (order: OrderResult, restaurantName: string): string => {
-  const lines: string[] = [];
-
-  lines.push(`⭐ *طلب جديد ${order.order_number}*`);
-  lines.push(`📍 من ${restaurantName}`);
-  lines.push('━━━━━━━━━━━━━━━');
-  lines.push('');
-
-  lines.push(`✅ *الاسم:* ${order.customer_name}`);
-  lines.push(`📱 *الهاتف:* ${order.customer_phone}`);
-  lines.push(
-    `🚚 *النوع:* ${order.order_type === 'delivery' ? 'توصيل' : 'استلام من المطعم'}`
-  );
-
-  if (order.address) {
-    lines.push(`📍 *العنوان:* ${order.address}`);
-  }
-
-  lines.push('');
-  lines.push('📦 *المنتجات:*');
-  order.items.forEach((item) => {
+  const buildWhatsAppMessage = (order: OrderResult): string => {
+    const lines: string[] = [];
+    lines.push(`🔔 *New Order ${order.order_number}*`);
+    lines.push('');
+    lines.push(`👤 *Customer:* ${order.customer_name}`);
+    lines.push(`📞 *Phone:* ${order.customer_phone}`);
     lines.push(
-      `  • ${item.qty}× ${item.name}  →  ${formatCurrency(item.price * item.qty, restaurant.currency)}`
+      `${order.order_type === 'delivery' ? '🛵' : '🏪'} *Type:* ${order.order_type === 'delivery' ? 'Delivery' : 'Pickup'}`
     );
-  });
 
-  lines.push('');
-  lines.push('━━━━━━━━━━━━━━━');
-  lines.push(`💰 *المجموع الفرعي:* ${formatCurrency(order.subtotal, restaurant.currency)}`);
+    if (order.address) {
+      lines.push(`📍 *Address:* ${order.address}`);
+    }
 
-  if (order.discount > 0) {
-    lines.push(`🎉 *الخصم:* -${formatCurrency(order.discount, restaurant.currency)}`);
-  }
+    lines.push('');
+    lines.push('📋 *Items:*');
+    order.items.forEach((item) => {
+      lines.push(
+        `  • ${item.qty}× ${item.name} — ${formatCurrency(item.price * item.qty, restaurant.currency)}`
+      );
+    });
 
-  if (order.delivery_fee > 0) {
-    lines.push(`🚚 *التوصيل:* ${formatCurrency(order.delivery_fee, restaurant.currency)}`);
-  }
+    lines.push('');
+    lines.push(
+      `💵 Subtotal: ${formatCurrency(order.subtotal, restaurant.currency)}`
+    );
 
-  lines.push(`💰 *الإجمالي:* ${formatCurrency(order.total, restaurant.currency)}`);
-  lines.push('');
+    if (order.discount > 0) {
+      lines.push(
+        `🎁 Discount: -${formatCurrency(order.discount, restaurant.currency)}`
+      );
+    }
 
-  if (order.notes) {
-    lines.push(`📝 *ملاحظات:* ${order.notes}`);
-  }
+    if (order.delivery_fee > 0) {
+      lines.push(
+        `🛵 Delivery: ${formatCurrency(order.delivery_fee, restaurant.currency)}`
+      );
+    }
 
-  lines.push('');
-  lines.push('━━━━━━━━━━━━━━━');
-  lines.push(`🕐 ${new Date().toLocaleString('en-GB')}`);
+    lines.push(
+      `💰 *Total: ${formatCurrency(order.total, restaurant.currency)}*`
+    );
 
-  return lines.join('\n');
-};
+    if (order.notes) {
+      lines.push('');
+      lines.push(`📝 *Notes:* ${order.notes}`);
+    }
+
+    return lines.join('\n');
+  };
+
   const openWhatsApp = () => {
     if (!orderResult) return;
-
-    const message = buildWhatsAppMessage(orderResult, restaurant.name);
+    const message = buildWhatsAppMessage(orderResult);
     const encodedMessage = encodeURIComponent(message);
-
-    // Clean restaurant phone (remove +, spaces, etc.)
     const restaurantPhone = (restaurant.phone ?? '').replace(/\D/g, '');
 
     if (!restaurantPhone) {
-      alert('رقم هاتف المطعم غير متوفر. الرجاء التواصل مع المطعم مباشرة.');
+      alert('رقم هاتف المطعم غير متوفر.');
       return;
     }
 
-    // wa.me link
     const url = `https://wa.me/${restaurantPhone}?text=${encodedMessage}`;
     window.open(url, '_blank');
   };
 
-  // ========== Submit Order ==========
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
 
-    // 1. Validate name
     if (!name.trim()) {
       setError('Please enter your name');
       return;
     }
 
-    // 2. Validate Lebanese phone
     if (!validateLebanesePhone(phone)) {
       setError(
-        'Please enter a valid Lebanese phone number (e.g. 70 123 456 or 03 123 456)'
+        'Please enter a valid Lebanese phone number (e.g. 70 123 456)'
       );
       return;
     }
 
-    // 3. Validate address for delivery
-    if (orderType === 'delivery' && !address.trim()) {
-      setError('Address is required for delivery');
-      return;
+    // ⬇️ تحقق من الموقع
+    if (orderType === 'delivery') {
+      if (location.type === 'manual' && !location.address?.trim()) {
+        setError('الرجاء كتابة العنوان');
+        return;
+      }
+      if (location.type === 'map' && (!location.lat || !location.lng)) {
+        setError('الرجاء تحديد موقعك على الخريطة');
+        return;
+      }
     }
 
-    // 4. Validate cart
     if (items.length === 0) {
       setError('Your cart is empty');
       return;
@@ -251,7 +248,15 @@ export default function CheckoutModal({
 
     const formattedPhone = formatPhone(phone);
 
-    // 5. INSERT order
+    // ⬇️ نبني الـ address حسب نوع الموقع
+    const finalAddress =
+      orderType === 'delivery'
+        ? location.type === 'map'
+          ? location.label ??
+            `${location.lat?.toFixed(5)}, ${location.lng?.toFixed(5)}`
+          : location.address ?? null
+        : null;
+
     const { data: order, error: orderError } = await supabase
       .from('orders')
       .insert({
@@ -259,7 +264,17 @@ export default function CheckoutModal({
         customer_name: name.trim(),
         customer_phone: formattedPhone,
         type: orderType,
-        address: orderType === 'delivery' ? address.trim() : null,
+        address: finalAddress,
+        latitude:
+          orderType === 'delivery' && location.type === 'map'
+            ? location.lat ?? null
+            : null,
+        longitude:
+          orderType === 'delivery' && location.type === 'map'
+            ? location.lng ?? null
+            : null,
+        location_type: location.type,
+        location_label: location.label ?? location.address ?? null,
         notes: notes.trim() || null,
         subtotal: sub,
         delivery_fee: deliveryFee,
@@ -275,7 +290,6 @@ export default function CheckoutModal({
       return;
     }
 
-    // 6. INSERT order_items
     const orderItems = items.map((i) => ({
       order_id: order.id,
       product_id: i.product_id,
@@ -295,7 +309,6 @@ export default function CheckoutModal({
       return;
     }
 
-    // 7. Increment offer uses
     if (appliedOffer) {
       await supabase
         .from('offers')
@@ -303,13 +316,12 @@ export default function CheckoutModal({
         .eq('id', appliedOffer.id);
     }
 
-    // 8. Save result for WhatsApp
     const result: OrderResult = {
       order_number: order.order_number ?? `#${order.id.slice(0, 6)}`,
       customer_name: name.trim(),
       customer_phone: formattedPhone,
       order_type: orderType,
-      address: orderType === 'delivery' ? address.trim() : null,
+      address: finalAddress,
       notes: notes.trim() || null,
       items: items.map((i) => ({
         name: i.name,
@@ -327,12 +339,11 @@ export default function CheckoutModal({
     clear();
   }
 
-  // ========== Reset & Close ==========
   const handleClose = () => {
     setOrderResult(null);
     setName('');
     setPhone('');
-    setAddress('');
+    setLocation({ type: 'map' });
     setNotes('');
     setCouponCode('');
     setAppliedOffer(null);
@@ -364,10 +375,9 @@ export default function CheckoutModal({
             transition={{ type: 'spring', damping: 30, stiffness: 300 }}
             className="fixed bottom-0 left-0 right-0 z-[60] bg-surface rounded-t-3xl max-h-[90vh] overflow-y-auto max-w-3xl mx-auto shadow-2xl"
           >
-            {/* ========== SUCCESS STATE ========== */}
             {orderResult ? (
+              /* ========== SUCCESS ========== */
               <div className="p-6 md:p-8">
-                {/* Success Icon */}
                 <motion.div
                   initial={{ scale: 0, rotate: -180 }}
                   animate={{ scale: 1, rotate: 0 }}
@@ -377,15 +387,17 @@ export default function CheckoutModal({
                   <Check size={40} className="text-green-600" strokeWidth={3} />
                 </motion.div>
 
-                {/* Title */}
                 <h2 className="text-2xl font-bold text-ink text-center mb-2">
                   Order Placed! 🎉
                 </h2>
                 <p className="text-sm text-ink-muted text-center mb-6">
-                  Your order <span className="font-mono font-bold text-ink">{orderResult.order_number}</span> has been received
+                  Order{' '}
+                  <span className="font-mono font-bold text-ink">
+                    {orderResult.order_number}
+                  </span>{' '}
+                  has been received
                 </p>
 
-                {/* Summary card */}
                 <div className="bg-cream rounded-2xl p-4 mb-6">
                   <div className="flex items-center justify-between mb-3">
                     <span className="text-sm text-ink-muted">Total</span>
@@ -406,7 +418,6 @@ export default function CheckoutModal({
                   </div>
                 </div>
 
-                {/* WhatsApp CTA */}
                 <div className="bg-green-500/5 border border-green-500/20 rounded-2xl p-4 mb-4">
                   <p className="text-xs text-ink-muted text-center mb-3">
                     📱 أرسل الطلب على واتساب المطعم للتأكيد الفوري
@@ -429,7 +440,6 @@ export default function CheckoutModal({
                   </motion.button>
                 </div>
 
-                {/* Done button */}
                 <button
                   onClick={handleDone}
                   className="w-full py-3 rounded-xl bg-cream hover:bg-brand/10 text-ink font-medium text-sm transition"
@@ -438,7 +448,7 @@ export default function CheckoutModal({
                 </button>
               </div>
             ) : (
-              /* ========== CHECKOUT FORM ========== */
+              /* ========== FORM ========== */
               <>
                 <div className="sticky top-0 bg-surface flex items-center justify-between p-4 border-b border-line z-10">
                   <h2 className="text-lg font-bold text-ink">Checkout</h2>
@@ -495,7 +505,7 @@ export default function CheckoutModal({
                     />
                   </div>
 
-                  {/* Phone — Lebanese only */}
+                  {/* Phone */}
                   <div>
                     <label className="text-sm font-medium text-ink mb-1 block">
                       Phone (Lebanon) *
@@ -523,24 +533,17 @@ export default function CheckoutModal({
                     </div>
                     <p className="text-xs text-ink-muted mt-1 flex items-center gap-1">
                       <Phone size={10} />
-                      أرقام مقبولة: 03 · 70 · 71 · 76 · 78 · 79 · 81
+                      03 · 70 · 71 · 76 · 78 · 79 · 81
                     </p>
                   </div>
 
-                  {/* Address */}
+                  {/* ⬇️ LOCATION PICKER ⬇️ */}
                   {orderType === 'delivery' && (
                     <div>
-                      <label className="text-sm font-medium text-ink mb-1 block">
-                        Address *
+                      <label className="text-sm font-medium text-ink mb-2 block">
+                        موقع التوصيل *
                       </label>
-                      <textarea
-                        required
-                        value={address}
-                        onChange={(e) => setAddress(e.target.value)}
-                        rows={2}
-                        className="w-full bg-white border border-line rounded-xl px-4 py-3 text-ink placeholder:text-ink-muted/50 focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 resize-none"
-                        placeholder="Street, building, floor..."
-                      />
+                      <LocationPicker value={location} onChange={setLocation} />
                     </div>
                   )}
 
