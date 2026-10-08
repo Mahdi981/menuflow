@@ -18,7 +18,6 @@ import { useRestaurant } from '@/lib/hooks/useRestaurant';
 import {
   usePlanLimits,
   formatLimit,
-  isAtLimit,
 } from '@/lib/hooks/usePlanLimits';
 
 const supabase = createClient();
@@ -115,7 +114,8 @@ export default function OverviewPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [restaurant?.id]);
 
-  if (restaurantLoading || loading) {
+  // ⚠️ فقط انتظر تحميل restaurant
+  if (restaurantLoading) {
     return (
       <div className="min-h-screen bg-cream p-8 flex items-center justify-center">
         <div className="w-8 h-8 rounded-full border-2 border-brand border-t-transparent animate-spin" />
@@ -123,13 +123,14 @@ export default function OverviewPage() {
     );
   }
 
+  // إذا ما في مطعم → setup
   if (!restaurant) {
     return (
       <div className="min-h-screen bg-cream p-8 text-center">
-        <p className="text-red-500">No restaurant found</p>
+        <p className="text-red-500 mb-4">No restaurant found</p>
         <Link
           href="/dashboard/setup"
-          className="text-brand underline mt-2 inline-block"
+          className="inline-block px-5 py-2.5 rounded-xl bg-brand hover:bg-brand-dark text-white font-semibold shadow-brand transition"
         >
           Setup your restaurant →
         </Link>
@@ -247,7 +248,11 @@ export default function OverviewPage() {
           </Link>
         </div>
 
-        {recentOrders.length === 0 ? (
+        {loading ? (
+          <div className="text-center py-8">
+            <div className="w-6 h-6 rounded-full border-2 border-brand border-t-transparent animate-spin mx-auto" />
+          </div>
+        ) : recentOrders.length === 0 ? (
           <div className="text-center py-12">
             <div className="w-16 h-16 rounded-2xl bg-brand/10 mx-auto flex items-center justify-center mb-4">
               <ShoppingBag size={28} className="text-brand" />
@@ -337,7 +342,11 @@ function LimitItem({
   max: number;
 }) {
   const isUnlimited = max >= 999999;
-  const pct = isUnlimited ? 0 : max > 0 ? Math.min((current / max) * 100, 100) : 0;
+  const pct = isUnlimited
+    ? 100
+    : max > 0
+      ? Math.min((current / max) * 100, 100)
+      : 0;
   const isWarning = !isUnlimited && pct >= 80;
 
   return (
@@ -360,7 +369,7 @@ function LimitItem({
           className={`h-full rounded-full transition-all ${
             isWarning ? 'bg-amber-custom' : 'bg-brand'
           }`}
-          style={{ width: `${isUnlimited ? 100 : pct}%` }}
+          style={{ width: `${pct}%` }}
         />
       </div>
     </div>

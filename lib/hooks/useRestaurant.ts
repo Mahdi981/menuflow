@@ -28,7 +28,9 @@ export type Restaurant = {
 };
 
 export function useRestaurant() {
-  const supabase = createClient();
+  // ✅ الحل: lazy init — بينفّذ مرة وحدة
+  const [supabase] = useState(() => createClient());
+
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
   const [subscription, setSubscription] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -69,7 +71,6 @@ export function useRestaurant() {
           setSubscription(null);
         } else {
           setRestaurant(data as Restaurant | null);
-          // TODO: fetch subscription later (Stripe Billing)
           setSubscription(null);
           setError('');
         }
@@ -85,13 +86,8 @@ export function useRestaurant() {
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [supabase]);
 
-  /**
-   * إنشاء مطعم جديد — يمرّ عبر API Route لأن الـ RLS
-   * تمنع الـ INSERT المباشر من المتصفح بدون JWT صحيح.
-   */
   const createRestaurant = async (input: {
     name: string;
     slug: string;

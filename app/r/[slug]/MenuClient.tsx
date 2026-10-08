@@ -7,6 +7,7 @@ import CategoryTabs from '@/components/CategoryTabs';
 import ProductCard from '@/components/ProductCard';
 import CartButton from '@/components/CartButton';
 import CartDrawer from '@/components/CartDrawer';
+import ProductDetailModal from '@/components/ProductDetailModal';
 import { useCart } from '@/lib/store/cart';
 
 export default function MenuClient({ menu }: { menu: FullMenu }) {
@@ -14,6 +15,8 @@ export default function MenuClient({ menu }: { menu: FullMenu }) {
     menu.categories[0]?.id ?? '__uncat__'
   );
   const [cartOpen, setCartOpen] = useState(false);
+  const [detailProduct, setDetailProduct] = useState<Product | null>(null);
+
   const totalItems = useCart((s) => s.items.reduce((a, i) => a + i.qty, 0));
   const addItem = useCart((s) => s.addItem);
 
@@ -76,6 +79,7 @@ export default function MenuClient({ menu }: { menu: FullMenu }) {
             product={p}
             currency={menu.currency}
             onAdd={() => addItem(menu.slug, p)}
+            onOpenDetail={() => setDetailProduct(p)}
           />
         ))}
 
@@ -88,6 +92,18 @@ export default function MenuClient({ menu }: { menu: FullMenu }) {
         open={cartOpen}
         onClose={() => setCartOpen(false)}
         restaurant={menu}
+      />
+
+      <ProductDetailModal
+        product={detailProduct}
+        currency={menu.currency}
+        open={detailProduct !== null}
+        onClose={() => setDetailProduct(null)}
+        onAdd={(options) => {
+          if (detailProduct) {
+            addItem(menu.slug, detailProduct, options);
+          }
+        }}
       />
     </div>
   );

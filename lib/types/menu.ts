@@ -1,5 +1,9 @@
+// ============================================
+// Restaurant
+// ============================================
 export type Restaurant = {
-  id: string;
+  id: string;              // UUID
+  owner_id: string;        // UUID
   name: string;
   name_ar: string | null;
   slug: string;
@@ -16,23 +20,52 @@ export type Restaurant = {
   is_active: boolean;
   accepts_delivery: boolean;
   accepts_pickup: boolean;
-  working_hours: Record<string, { open: string; close: string }> | null;
+  working_hours: any;
   plan: 'starter' | 'professional' | 'business';
+  created_at: string;
 };
 
+// ============================================
+// Category
+// ============================================
 export type Category = {
-  id: string;
-  restaurant_id: string;
+  id: string;              // UUID
+  restaurant_id: string;   // UUID
   name: string;
   name_ar: string | null;
   icon: string | null;
   sort_order: number;
+  created_at?: string;
+};
+
+// ============================================
+// Product
+// ============================================
+export type ProductAddon = {
+  id: string;
+  product_id: string;
+  name: string;
+  name_ar: string | null;
+  price: number;
+  is_available: boolean;
+  sort_order: number;
+};
+
+export type ProductVariant = {
+  id: string;
+  product_id: string;
+  name: string;
+  name_ar: string | null;
+  price: number;
+  is_default: boolean;
+  is_available: boolean;
+  sort_order: number;
 };
 
 export type Product = {
-  id: string;
-  restaurant_id: string;
-  category_id: string | null;
+  id: string;              // UUID
+  restaurant_id: string;   // UUID
+  category_id: string | null; // UUID
   name: string;
   description: string | null;
   price: number;
@@ -41,29 +74,68 @@ export type Product = {
   available: boolean;
   featured: boolean;
   sort_order: number;
+  created_at?: string;
+  // جديد
+  addons?: ProductAddon[];
+  variants?: ProductVariant[];
 };
 
+// ============================================
+// Cart
+// ============================================
 export type CartItem = {
+  cart_item_id: string;   // unique per combination
   product_id: string;
   name: string;
-  price: number;         // effective price (after discount)
+  base_price: number;
+  price: number;           // effective price
   original_price: number;
   qty: number;
   image_url: string | null;
+  // variant
+  variant_id?: string | null;
+  variant_name?: string | null;
+  // addons
+  addons?: { id: string; name: string; price: number }[];
+  // notes
+  notes?: string | null;
 };
 
+// ============================================
+// Order
+// ============================================
 export type OrderType = 'delivery' | 'pickup';
 
 export type OrderStatus =
-  | 'pending' | 'confirmed' | 'preparing' | 'ready'
-  | 'delivering' | 'completed' | 'cancelled';
+  | 'pending'
+  | 'accepted'
+  | 'preparing'
+  | 'ready'
+  | 'out_for_delivery'
+  | 'completed'
+  | 'cancelled';
 
+// ============================================
+// Menu (Full data)
+// ============================================
 export type FullMenu = Restaurant & {
   categories: (Category & { products: Product[] })[];
-  uncategorized: Product[];  // products with category_id = null
+  uncategorized: Product[];
 };
 
-// helper
+// ============================================
+// Helpers
+// ============================================
 export function effectivePrice(p: Product): number {
   return p.discount_price ?? p.price;
+}
+
+export function generateCartItemId(
+  productId: string,
+  variantId?: string | null,
+  addonIds?: string[]
+): string {
+  const variant = variantId ?? 'no-variant';
+  const addons = (addonIds ?? []).sort().join(',') || 'no-addons';
+  return `${productId}-${variant}-${addons}`;
 }

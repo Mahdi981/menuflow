@@ -24,11 +24,15 @@ async function getMenu(slug: string): Promise<FullMenu | null> {
     .order('sort_order', { ascending: true });
 
   const { data: products } = await supabase
-    .from('products')
-    .select('*')
-    .eq('restaurant_id', restaurant.id)
-    .eq('available', true)
-    .order('sort_order', { ascending: true });
+  .from('products')
+  .select(`
+    *,
+    addons:product_addons(*),
+    variants:product_variants(*)
+  `)
+  .eq('restaurant_id', restaurant.id)
+  .eq('available', true)
+  .order('sort_order', { ascending: true });
 
   const cats = (categories ?? []) as Category[];
   const prods = (products ?? []) as Product[];

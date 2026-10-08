@@ -31,7 +31,14 @@ type OrderResult = {
   order_type: 'delivery' | 'pickup';
   address: string | null;
   notes: string | null;
-  items: { name: string; qty: number; price: number }[];
+  items: {
+    name: string;
+    qty: number;
+    price: number;
+    variant_name?: string | null;
+    addons?: { name: string; price: number }[];
+    notes?: string | null;
+  }[];
   subtotal: number;
   delivery_fee: number;
   discount: number;
@@ -55,12 +62,7 @@ export default function CheckoutModal({
   const [orderType, setOrderType] = useState<OrderType>(
     restaurant.accepts_delivery ? 'delivery' : 'pickup'
   );
-
-  // ⬇️ استبدل address القديم بـ location
-  const [location, setLocation] = useState<LocationData>({
-    type: 'map',
-  });
-
+  const [location, setLocation] = useState<LocationData>({ type: 'map' });
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -162,9 +164,18 @@ export default function CheckoutModal({
     lines.push('');
     lines.push('📋 *Items:*');
     order.items.forEach((item) => {
+      const variantText = item.variant_name ? ` (${item.variant_name})` : '';
       lines.push(
-        `  • ${item.qty}× ${item.name} — ${formatCurrency(item.price * item.qty, restaurant.currency)}`
+        `  • ${item.qty}× ${item.name}${variantText} — ${formatCurrency(item.price * item.qty, restaurant.currency)}`
       );
+      if (item.addons && item.addons.length > 0) {
+        item.addons.forEach((addon) => {
+          lines.push(`    + ${addon.name} (${formatCurrency(addon.price, restaurant.currency)})`);
+        });
+      }
+      if (item.notes) {
+        lines.push(`    📝 ${item.notes}`);
+      }
     });
 
     lines.push('');
@@ -221,13 +232,10 @@ export default function CheckoutModal({
     }
 
     if (!validateLebanesePhone(phone)) {
-      setError(
-        'Please enter a valid Lebanese phone number (e.g. 70 123 456)'
-      );
+      setError('Please enter a valid Lebanese phone number (e.g. 70 123 456)');
       return;
     }
 
-    // ⬇️ تحقق من الموقع
     if (orderType === 'delivery') {
       if (location.type === 'manual' && !location.address?.trim()) {
         setError('الرجاء كتابة العنوان');
@@ -248,7 +256,6 @@ export default function CheckoutModal({
 
     const formattedPhone = formatPhone(phone);
 
-    // ⬇️ نبني الـ address حسب نوع الموقع
     const finalAddress =
       orderType === 'delivery'
         ? location.type === 'map'
@@ -257,6 +264,7 @@ export default function CheckoutModal({
           : location.address ?? null
         : null;
 
+    // 1. INSERT order
     const { data: order, error: orderError } = await supabase
       .from('orders')
       .insert({
@@ -290,6 +298,7 @@ export default function CheckoutModal({
       return;
     }
 
+    // 2. INSERT order_items مع variant + addons + notes
     const orderItems = items.map((i) => ({
       order_id: order.id,
       product_id: i.product_id,
@@ -297,6 +306,9 @@ export default function CheckoutModal({
       price: i.price,
       quantity: i.qty,
       total: i.price * i.qty,
+      variant_name: i.variant_name ?? null,
+      addons: i.addons ?? [],
+      notes: i.notes ?? null,
     }));
 
     const { error: itemsError } = await supabase
@@ -309,6 +321,7 @@ export default function CheckoutModal({
       return;
     }
 
+    // 3. Increment offer uses
     if (appliedOffer) {
       await supabase
         .from('offers')
@@ -327,6 +340,9 @@ export default function CheckoutModal({
         name: i.name,
         qty: i.qty,
         price: i.price,
+        variant_name: i.variant_name ?? null,
+        addons: i.addons ?? [],
+        notes: i.notes ?? null,
       })),
       subtotal: sub,
       delivery_fee: deliveryFee,
@@ -537,7 +553,7 @@ export default function CheckoutModal({
                     </p>
                   </div>
 
-                  {/* ⬇️ LOCATION PICKER ⬇️ */}
+                  {/* Location */}
                   {orderType === 'delivery' && (
                     <div>
                       <label className="text-sm font-medium text-ink mb-2 block">

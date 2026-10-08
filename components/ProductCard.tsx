@@ -9,10 +9,12 @@ export default function ProductCard({
   product,
   currency,
   onAdd,
+  onOpenDetail,
 }: {
   product: Product;
   currency: string;
   onAdd: () => void;
+  onOpenDetail?: () => void;
 }) {
   const hasDiscount =
     product.discount_price !== null && product.discount_price < product.price;
@@ -22,12 +24,19 @@ export default function ProductCard({
     ? Math.round(((product.price - displayPrice) / product.price) * 100)
     : 0;
 
+  const hasOptions =
+    (product.variants && product.variants.length > 0) ||
+    (product.addons && product.addons.length > 0);
+
   return (
     <motion.div
       layout
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      className="group bg-surface rounded-2xl shadow-soft hover:shadow-brand border border-line hover:border-brand/30 transition-all p-3 flex gap-3"
+      onClick={hasOptions ? onOpenDetail : undefined}
+      className={`group bg-surface rounded-2xl shadow-soft hover:shadow-brand border border-line hover:border-brand/30 transition-all p-3 flex gap-3 ${
+        hasOptions ? 'cursor-pointer' : ''
+      }`}
     >
       {/* Image */}
       <div className="relative w-28 h-28 rounded-xl overflow-hidden bg-cream flex-shrink-0">
@@ -44,14 +53,12 @@ export default function ProductCard({
           </div>
         )}
 
-        {/* Discount badge */}
         {hasDiscount && (
           <div className="absolute top-2 left-2 bg-amber-custom text-white text-xs font-bold px-2 py-1 rounded-lg shadow-lg">
             {discountPercent}% OFF
           </div>
         )}
 
-        {/* Featured badge */}
         {product.featured && !hasDiscount && (
           <div className="absolute top-2 left-2 bg-brand text-white text-xs font-bold px-2 py-1 rounded-lg shadow-lg flex items-center gap-1">
             ⭐
@@ -71,6 +78,12 @@ export default function ProductCard({
           </p>
         )}
 
+        {hasOptions && (
+          <p className="text-xs text-brand font-medium mt-1">
+            اضغط للتفاصيل والإضافات
+          </p>
+        )}
+
         <div className="mt-auto flex items-end justify-between gap-2 pt-3">
           <div className="flex items-baseline gap-2">
             <span className="font-bold text-brand text-lg">
@@ -86,7 +99,14 @@ export default function ProductCard({
           <motion.button
             whileTap={{ scale: 0.9 }}
             whileHover={{ scale: 1.05 }}
-            onClick={onAdd}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (hasOptions) {
+                onOpenDetail?.();
+              } else {
+                onAdd();
+              }
+            }}
             className="w-10 h-10 rounded-xl bg-gradient-to-br from-brand to-brand-dark hover:shadow-brand-lg text-white flex items-center justify-center shadow-md transition"
             aria-label="Add to cart"
           >
