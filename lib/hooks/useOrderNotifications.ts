@@ -32,7 +32,6 @@ export function useOrderNotifications(orders: Order[]) {
 
   // Watch orders
   useEffect(() => {
-    // First load — just mark all as seen
     if (!initialized.current) {
       orders.forEach((o) => seenIds.current.add(o.id));
       initialized.current = true;
@@ -40,7 +39,6 @@ export function useOrderNotifications(orders: Order[]) {
     }
 
     const newOrders = orders.filter((o) => !seenIds.current.has(o.id));
-
     if (newOrders.length === 0) return;
 
     newOrders.forEach((order) => {
