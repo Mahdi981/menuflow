@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useEffect, useState } from 'react';
 import {
   LayoutGrid,
   ShoppingBag,
@@ -18,6 +19,7 @@ import {
   X,
   PanelLeftClose,
   PanelLeftOpen,
+  Shield,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 
@@ -35,6 +37,8 @@ const NAV = [
   { name: 'Settings', href: '/dashboard/settings', icon: Settings },
 ];
 
+const SUPER_ADMIN_EMAIL = 'mahdi.dev.dev@gmail.com';
+
 type Props = {
   isMobileOpen: boolean;
   onMobileClose: () => void;
@@ -50,6 +54,40 @@ export default function Sidebar({
 }: Props) {
   const pathname = usePathname();
   const router = useRouter();
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+
+  // التحقق من Super Admin
+  useEffect(() => {
+    const checkAdmin = async () => {
+      try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+
+        if (!user?.email) return;
+
+        // 1. إيميل ثابت
+        if (user.email === SUPER_ADMIN_EMAIL) {
+          setIsSuperAdmin(true);
+          return;
+        }
+
+        // 2. من جدول super_admins
+        const { data } = await supabase
+          .from('super_admins')
+          .select('id')
+          .eq('user_id', user.id)
+          .eq('is_active', true)
+          .maybeSingle();
+
+        if (data) setIsSuperAdmin(true);
+      } catch {
+        // silently fail
+      }
+    };
+
+    checkAdmin();
+  }, []);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -57,7 +95,7 @@ export default function Sidebar({
   };
 
   const handleNavClick = () => {
-    if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+    if (window.innerWidth < 1024) {
       onMobileClose();
     }
   };
@@ -132,6 +170,31 @@ export default function Sidebar({
             </Link>
           );
         })}
+
+        {/* Admin Panel — يظهر فقط للـ Super Admin */}
+        {isSuperAdmin && (
+          <div className="pt-2 mt-2 border-t border-white/10">
+            <Link
+              href="/admin"
+              onClick={handleNavClick}
+              className="relative block"
+              title={collapsed ? 'Admin Panel' : undefined}
+            >
+              <div
+                className={`relative flex items-center rounded-xl text-sm font-bold transition-colors ${
+                  collapsed ? 'justify-center p-3' : 'gap-3 px-3 py-2.5'
+                } bg-amber-custom/10 hover:bg-amber-custom/20 text-amber-custom border border-amber-custom/30`}
+              >
+                <Shield size={18} className="relative shrink-0" />
+                {!collapsed && (
+                  <span className="relative uppercase tracking-wider text-xs">
+                    Admin Panel
+                  </span>
+                )}
+              </div>
+            </Link>
+          </div>
+        )}
       </nav>
 
       {/* Logout */}
@@ -174,11 +237,10 @@ export default function Sidebar({
         </button>
       </aside>
 
-      {/* ============ MOBILE SIDEBAR ============ */}
+      {/* ============ MOBILE SIDEBAR (Drawer) ============ */}
       <AnimatePresence>
         {isMobileOpen && (
           <>
-            {/* Overlay */}
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -187,7 +249,6 @@ export default function Sidebar({
               className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden"
             />
 
-            {/* Sidebar */}
             <motion.aside
               initial={{ x: '-100%' }}
               animate={{ x: 0 }}
@@ -202,7 +263,6 @@ export default function Sidebar({
               >
                 <X size={20} />
               </button>
-
               <NavContent />
             </motion.aside>
           </>
