@@ -1,10 +1,25 @@
-"use client";
+'use client';
 
-import { motion, AnimatePresence } from "framer-motion";
-import { useState, useEffect } from "react";
-import { createClient } from "@/lib/supabase/client";
-import { useRestaurant } from "@/lib/hooks/useRestaurant";
-import { Plus, Edit, Trash2, X, Save, Grid3x3 } from "lucide-react";
+import { motion, AnimatePresence } from 'framer-motion';
+import { useState, useEffect } from 'react';
+import Link from 'next/link';
+import { createClient } from '@/lib/supabase/client';
+import { useRestaurant } from '@/lib/hooks/useRestaurant';
+import {
+  usePlanLimits,
+  formatLimit,
+  isAtLimit,
+} from '@/lib/hooks/usePlanLimits';
+import {
+  Plus,
+  Edit,
+  Trash2,
+  X,
+  Save,
+  Grid3x3,
+  Crown,
+  ArrowRight,
+} from 'lucide-react';
 
 type Category = {
   id: number;
@@ -16,20 +31,20 @@ type Category = {
 };
 
 const emojiOptions = [
-  "🍔",
-  "🍕",
-  "🍗",
-  "🥤",
-  "🍰",
-  "🥗",
-  "🍟",
-  "🌮",
-  "🍜",
-  "🍣",
-  "🍝",
-  "🥙",
-  "🍦",
-  "☕",
+  '🍔',
+  '🍕',
+  '🍗',
+  '🥤',
+  '🍰',
+  '🥗',
+  '🍟',
+  '🌮',
+  '🍜',
+  '🍣',
+  '🍝',
+  '🥙',
+  '🍦',
+  '☕',
 ];
 
 const fadeInUp = {
@@ -45,27 +60,34 @@ const stagger = {
 export default function CategoriesPage() {
   const supabase = createClient();
   const { restaurant, loading: restLoading } = useRestaurant();
+  const { limits } = usePlanLimits(restaurant?.plan);
+
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<Category | null>(null);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState('');
   const [formData, setFormData] = useState({
-    name: "",
-    name_ar: "",
-    icon: "🍔",
+    name: '',
+    name_ar: '',
+    icon: '🍔',
   });
+
+  // Plan limits
+  const categoryCount = categories.length;
+  const categoryLimit = limits?.max_categories ?? 1;
+  const atLimit = isAtLimit(categoryCount, categoryLimit);
 
   const fetchCategories = async () => {
     if (!restaurant) return;
     setLoading(true);
     const { data, error } = await supabase
-      .from("categories")
-      .select("*")
-      .eq("restaurant_id", restaurant.id)
-      .order("created_at", { ascending: true });
+      .from('categories')
+      .select('*')
+      .eq('restaurant_id', restaurant.id)
+      .order('created_at', { ascending: true });
 
     if (error) {
       setError(error.message);
@@ -83,9 +105,15 @@ export default function CategoriesPage() {
   }, [restaurant]);
 
   const openAddModal = () => {
+    if (atLimit) {
+      alert(
+        `وصلت الحد الأقصى (${formatLimit(categoryLimit)} فئات على خطة ${restaurant?.plan})`
+      );
+      return;
+    }
     setEditingCategory(null);
-    setFormData({ name: "", name_ar: "", icon: "🍔" });
-    setError("");
+    setFormData({ name: '', name_ar: '', icon: '🍔' });
+    setError('');
     setModalOpen(true);
   };
 
@@ -93,32 +121,32 @@ export default function CategoriesPage() {
     setEditingCategory(cat);
     setFormData({
       name: cat.name,
-      name_ar: cat.name_ar || "",
-      icon: cat.icon || "🍔",
+      name_ar: cat.name_ar || '',
+      icon: cat.icon || '🍔',
     });
-    setError("");
+    setError('');
     setModalOpen(true);
   };
 
   const saveCategory = async () => {
     if (!formData.name || !restaurant) return;
     setSaving(true);
-    setError("");
+    setError('');
 
     try {
       if (editingCategory) {
         const { error } = await supabase
-          .from("categories")
+          .from('categories')
           .update({
             name: formData.name,
             name_ar: formData.name_ar || null,
             icon: formData.icon,
           })
-          .eq("id", editingCategory.id);
+          .eq('id', editingCategory.id);
 
         if (error) throw error;
       } else {
-        const { error } = await supabase.from("categories").insert({
+        const { error } = await supabase.from('categories').insert({
           restaurant_id: restaurant.id,
           name: formData.name,
           name_ar: formData.name_ar || null,
@@ -131,7 +159,7 @@ export default function CategoriesPage() {
       await fetchCategories();
       setModalOpen(false);
     } catch (err: any) {
-      setError(err.message || "Failed to save");
+      setError(err.message || 'Failed to save');
     } finally {
       setSaving(false);
     }
@@ -142,16 +170,16 @@ export default function CategoriesPage() {
     setSaving(true);
     try {
       const { error } = await supabase
-        .from("categories")
+        .from('categories')
         .delete()
-        .eq("id", deleteConfirm.id);
+        .eq('id', deleteConfirm.id);
 
       if (error) throw error;
 
       await fetchCategories();
       setDeleteConfirm(null);
     } catch (err: any) {
-      setError(err.message || "Failed to delete");
+      setError(err.message || 'Failed to delete');
     } finally {
       setSaving(false);
     }
@@ -186,15 +214,52 @@ export default function CategoriesPage() {
           </p>
         </div>
         <motion.button
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
+          whileHover={{ scale: atLimit ? 1 : 1.02 }}
+          whileTap={{ scale: atLimit ? 1 : 0.98 }}
           onClick={openAddModal}
-          className="bg-brand hover:bg-brand-dark text-white px-5 py-2.5 rounded-xl text-sm font-semibold shadow-brand transition flex items-center justify-center gap-2"
+          disabled={atLimit}
+          className={`px-5 py-2.5 rounded-xl text-sm font-semibold transition flex items-center justify-center gap-2 ${
+            atLimit
+              ? 'bg-cream text-ink-muted cursor-not-allowed border border-line'
+              : 'bg-brand hover:bg-brand-dark text-white shadow-brand'
+          }`}
         >
           <Plus size={16} />
-          Add Category
+          {atLimit
+            ? `Limit Reached (${categoryCount}/${formatLimit(categoryLimit)})`
+            : 'Add Category'}
         </motion.button>
       </motion.div>
+
+      {/* Limit Reached Banner */}
+      {atLimit && (
+        <motion.div
+          variants={fadeInUp}
+          className="bg-amber-custom/10 border border-amber-custom/30 rounded-2xl p-5"
+        >
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-xl bg-amber-custom/20 flex items-center justify-center text-amber-custom shrink-0">
+              <Crown size={20} />
+            </div>
+            <div className="flex-1">
+              <p className="font-bold text-ink">وصلت حد الفئات</p>
+              <p className="text-sm text-ink-muted mt-1">
+                أنت على خطة{' '}
+                <strong className="text-amber-custom uppercase">
+                  {restaurant?.plan}
+                </strong>{' '}
+                — الحد الأقصى {formatLimit(categoryLimit)} فئة.
+              </p>
+              <Link
+                href="/pricing"
+                className="inline-flex items-center gap-1 text-sm text-brand font-semibold mt-2 hover:underline"
+              >
+                ترقية للحصول على المزيد <ArrowRight size={14} />
+              </Link>
+            </div>
+          </div>
+        </motion.div>
+      )}
 
       {/* Stats */}
       <motion.div
@@ -216,7 +281,9 @@ export default function CategoriesPage() {
           <p className="text-xs text-ink-muted uppercase tracking-wider mb-1">
             Plan Limit
           </p>
-          <p className="text-2xl font-bold text-amber-custom">1</p>
+          <p className="text-2xl font-bold text-amber-custom">
+            {formatLimit(categoryLimit)}
+          </p>
         </div>
         <div className="bg-surface rounded-2xl p-4 border border-line shadow-soft">
           <p className="text-xs text-ink-muted uppercase tracking-wider mb-1">
@@ -249,15 +316,18 @@ export default function CategoriesPage() {
             <div className="w-16 h-16 bg-brand/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
               <Grid3x3 size={24} className="text-brand" />
             </div>
-            <p className="text-ink-muted font-medium mb-1">
-              No categories yet
-            </p>
+            <p className="text-ink-muted font-medium mb-1">No categories yet</p>
             <p className="text-xs text-ink-muted/70 mb-4">
               Add your first category to get started
             </p>
             <button
               onClick={openAddModal}
-              className="bg-brand hover:bg-brand-dark text-white px-5 py-2.5 rounded-xl text-sm font-semibold shadow-brand transition inline-flex items-center gap-2"
+              disabled={atLimit}
+              className={`px-5 py-2.5 rounded-xl text-sm font-semibold transition inline-flex items-center gap-2 ${
+                atLimit
+                  ? 'bg-cream text-ink-muted cursor-not-allowed'
+                  : 'bg-brand hover:bg-brand-dark text-white shadow-brand'
+              }`}
             >
               <Plus size={16} />
               Add Category
@@ -277,7 +347,7 @@ export default function CategoriesPage() {
                   className="p-4 flex items-center gap-4 hover:bg-cream transition"
                 >
                   <div className="w-12 h-12 bg-brand/10 rounded-xl flex items-center justify-center text-2xl flex-shrink-0">
-                    {cat.icon || "🍔"}
+                    {cat.icon || '🍔'}
                   </div>
 
                   <div className="flex-1 min-w-0">
@@ -285,7 +355,7 @@ export default function CategoriesPage() {
                       {cat.name}
                     </h3>
                     <p className="text-xs text-ink-muted truncate">
-                      {cat.name_ar || "—"}
+                      {cat.name_ar || '—'}
                     </p>
                   </div>
 
@@ -329,7 +399,7 @@ export default function CategoriesPage() {
             >
               <div className="p-5 border-b border-line flex items-center justify-between">
                 <h2 className="text-lg font-bold text-ink">
-                  {editingCategory ? "Edit Category" : "Add New Category"}
+                  {editingCategory ? 'Edit Category' : 'Add New Category'}
                 </h2>
                 <button
                   onClick={() => setModalOpen(false)}
@@ -390,8 +460,8 @@ export default function CategoriesPage() {
                         }
                         className={`aspect-square rounded-xl text-xl flex items-center justify-center transition ${
                           formData.icon === emoji
-                            ? "bg-brand/10 border-2 border-brand"
-                            : "bg-cream hover:bg-brand/10 border-2 border-transparent"
+                            ? 'bg-brand/10 border-2 border-brand'
+                            : 'bg-cream hover:bg-brand/10 border-2 border-transparent'
                         }`}
                       >
                         {emoji}
@@ -413,16 +483,16 @@ export default function CategoriesPage() {
                   disabled={!formData.name || saving}
                   className={`flex-1 py-3 rounded-xl text-sm font-semibold transition flex items-center justify-center gap-2 ${
                     formData.name && !saving
-                      ? "bg-brand hover:bg-brand-dark text-white shadow-brand"
-                      : "bg-cream text-ink-muted cursor-not-allowed"
+                      ? 'bg-brand hover:bg-brand-dark text-white shadow-brand'
+                      : 'bg-cream text-ink-muted cursor-not-allowed'
                   }`}
                 >
                   <Save size={16} />
                   {saving
-                    ? "Saving..."
+                    ? 'Saving...'
                     : editingCategory
-                      ? "Save Changes"
-                      : "Add Category"}
+                      ? 'Save Changes'
+                      : 'Add Category'}
                 </button>
               </div>
             </motion.div>
@@ -454,7 +524,7 @@ export default function CategoriesPage() {
                 Delete Category?
               </h3>
               <p className="text-sm text-ink-muted mb-6">
-                Are you sure you want to delete{" "}
+                Are you sure you want to delete{' '}
                 <span className="font-semibold text-ink">
                   {deleteConfirm.name}
                 </span>
@@ -472,7 +542,7 @@ export default function CategoriesPage() {
                   disabled={saving}
                   className="flex-1 bg-red-600 hover:bg-red-700 py-3 rounded-xl text-sm font-semibold text-white transition disabled:opacity-50"
                 >
-                  {saving ? "Deleting..." : "Delete"}
+                  {saving ? 'Deleting...' : 'Delete'}
                 </button>
               </div>
             </motion.div>

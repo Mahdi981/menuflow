@@ -15,6 +15,11 @@ import {
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useRestaurant } from '@/lib/hooks/useRestaurant';
+import {
+  usePlanLimits,
+  formatLimit,
+  isAtLimit,
+} from '@/lib/hooks/usePlanLimits';
 
 const supabase = createClient();
 
@@ -30,6 +35,8 @@ type Stats = {
 
 export default function OverviewPage() {
   const { restaurant, loading: restaurantLoading } = useRestaurant();
+  const { limits } = usePlanLimits(restaurant?.plan);
+
   const [stats, setStats] = useState<Stats>({
     todayOrders: 0,
     todayRevenue: 0,
@@ -70,18 +77,14 @@ export default function OverviewPage() {
       if (cancelled) return;
 
       const orders = ordersRes.data ?? [];
-      const todayOrders = orders.filter(
-        (o) => new Date(o.created_at) >= today
-      );
+      const todayOrders = orders.filter((o) => new Date(o.created_at) >= today);
       const todayRevenue = todayOrders
         .filter((o) => o.status !== 'cancelled')
         .reduce((s, o) => s + Number(o.total || 0), 0);
       const uniqueCustomers = new Set(
         orders.map((o) => o.customer_phone).filter(Boolean)
       ).size;
-      const pendingOrders = orders.filter(
-        (o) => o.status === 'pending'
-      ).length;
+      const pendingOrders = orders.filter((o) => o.status === 'pending').length;
 
       setStats({
         todayOrders: todayOrders.length,
@@ -97,8 +100,7 @@ export default function OverviewPage() {
         [...orders]
           .sort(
             (a, b) =>
-              new Date(b.created_at).getTime() -
-              new Date(a.created_at).getTime()
+              new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
           )
           .slice(0, 5)
       );
@@ -107,7 +109,6 @@ export default function OverviewPage() {
     };
 
     fetchStats();
-
     return () => {
       cancelled = true;
     };
@@ -201,24 +202,24 @@ export default function OverviewPage() {
           <h2 className="font-semibold text-ink">Plan Limits</h2>
         </div>
 
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <LimitItem
             icon={<ShoppingBag size={14} />}
             label="Orders"
             current={stats.totalOrders}
-            max={restaurant.plan === 'starter' ? 20 : 500}
+            max={limits?.max_orders_per_month ?? 20}
           />
           <LimitItem
             icon={<Package size={14} />}
             label="Products"
             current={stats.totalProducts}
-            max={restaurant.plan === 'starter' ? 30 : 999}
+            max={limits?.max_products ?? 30}
           />
           <LimitItem
             icon={<Grid3x3 size={14} />}
             label="Categories"
             current={stats.totalCategories}
-            max={restaurant.plan === 'starter' ? 1 : 50}
+            max={limits?.max_categories ?? 1}
           />
         </div>
       </motion.div>
@@ -318,9 +319,7 @@ function StatCard({
       >
         {icon}
       </div>
-      <p className="text-xs text-ink-muted uppercase tracking-wider">
-        {label}
-      </p>
+      <p className="text-xs text-ink-muted uppercase tracking-wider">{label}</p>
       <p className="text-xl md:text-2xl font-bold text-ink mt-1">{value}</p>
     </motion.div>
   );
@@ -337,8 +336,9 @@ function LimitItem({
   current: number;
   max: number;
 }) {
-  const pct = max > 0 ? Math.min((current / max) * 100, 100) : 0;
-  const isWarning = pct >= 80;
+  const isUnlimited = max >= 999999;
+  const pct = isUnlimited ? 0 : max > 0 ? Math.min((current / max) * 100, 100) : 0;
+  const isWarning = !isUnlimited && pct >= 80;
 
   return (
     <div>
@@ -352,7 +352,7 @@ function LimitItem({
             isWarning ? 'text-amber-custom' : 'text-ink'
           }`}
         >
-          {current}/{max}
+          {current}/{formatLimit(max)}
         </span>
       </div>
       <div className="h-1.5 bg-cream rounded-full overflow-hidden">
@@ -360,7 +360,7 @@ function LimitItem({
           className={`h-full rounded-full transition-all ${
             isWarning ? 'bg-amber-custom' : 'bg-brand'
           }`}
-          style={{ width: `${pct}%` }}
+          style={{ width: `${isUnlimited ? 100 : pct}%` }}
         />
       </div>
     </div>

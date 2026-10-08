@@ -1,21 +1,24 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import {
   Settings,
   Shield,
   Bell,
   Globe,
-  DollarSign,
   Save,
   Loader2,
   Check,
 } from 'lucide-react';
+import { createClient } from '@/lib/supabase/client';
 
 export default function AdminSettingsPage() {
+  const [supabase] = useState(() => createClient());
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const [settings, setSettings] = useState({
     platform_name: 'MenuFlow',
@@ -28,11 +31,65 @@ export default function AdminSettingsPage() {
     slack_notifications: false,
   });
 
+  // Load from DB
+  useEffect(() => {
+    const fetchSettings = async () => {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('platform_settings')
+        .select('*')
+        .eq('id', 1)
+        .maybeSingle();
+
+      if (error) {
+        console.error('Failed to load settings:', error);
+        setError('Failed to load settings');
+      } else if (data) {
+        setSettings({
+          platform_name: data.platform_name,
+          support_email: data.support_email,
+          default_currency: data.default_currency,
+          enable_signups: data.enable_signups,
+          enable_new_restaurants: data.enable_new_restaurants,
+          maintenance_mode: data.maintenance_mode,
+          email_notifications: data.email_notifications,
+          slack_notifications: data.slack_notifications,
+        });
+      }
+      setLoading(false);
+    };
+
+    fetchSettings();
+  }, [supabase]);
+
   const handleSave = async () => {
     setSaving(true);
-    // TODO: Save to a platform_settings table
-    await new Promise((r) => setTimeout(r, 1000));
+    setError(null);
+    setSuccess(false);
+
+    const { error: updateError } = await supabase
+      .from('platform_settings')
+      .update({
+        platform_name: settings.platform_name,
+        support_email: settings.support_email,
+        default_currency: settings.default_currency,
+        enable_signups: settings.enable_signups,
+        enable_new_restaurants: settings.enable_new_restaurants,
+        maintenance_mode: settings.maintenance_mode,
+        email_notifications: settings.email_notifications,
+        slack_notifications: settings.slack_notifications,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', 1);
+
     setSaving(false);
+
+    if (updateError) {
+      console.error('Save failed:', updateError);
+      setError(updateError.message);
+      return;
+    }
+
     setSuccess(true);
     setTimeout(() => setSuccess(false), 2500);
   };
@@ -44,12 +101,20 @@ export default function AdminSettingsPage() {
     setSettings((prev) => ({ ...prev, [key]: value }));
   };
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-cream flex items-center justify-center">
+        <Loader2 size={32} className="animate-spin text-amber-custom" />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-cream p-4 md:p-6">
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-brand/10 border border-brand/20 flex items-center justify-center text-brand">
+          <div className="w-10 h-10 rounded-xl bg-amber-custom/10 border border-amber-custom/20 flex items-center justify-center text-amber-custom">
             <Settings size={20} />
           </div>
           <div>
@@ -74,9 +139,15 @@ export default function AdminSettingsPage() {
         </button>
       </div>
 
+      {error && (
+        <div className="mb-6 p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-600 text-sm">
+          {error}
+        </div>
+      )}
+
       {success && (
         <div className="mb-6 p-4 rounded-xl bg-green-500/10 border border-green-500/30 text-green-600 text-sm">
-          ✅ Settings saved
+          ✅ Settings saved successfully
         </div>
       )}
 
@@ -169,7 +240,7 @@ function Section({
       className="bg-surface border border-line rounded-2xl p-5 md:p-6 shadow-soft"
     >
       <div className="flex items-center gap-2 mb-5">
-        <div className="w-8 h-8 rounded-lg bg-brand/10 flex items-center justify-center text-brand">
+        <div className="w-8 h-8 rounded-lg bg-amber-custom/10 flex items-center justify-center text-amber-custom">
           {icon}
         </div>
         <h2 className="font-semibold text-ink">{title}</h2>

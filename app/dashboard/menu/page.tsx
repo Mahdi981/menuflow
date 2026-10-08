@@ -1,10 +1,16 @@
-"use client";
+'use client';
 
-import { motion, AnimatePresence } from "framer-motion";
-import { useState, useEffect, useRef } from "react";
-import Image from "next/image";
-import { createClient } from "@/lib/supabase/client";
-import { useRestaurant } from "@/lib/hooks/useRestaurant";
+import { motion, AnimatePresence } from 'framer-motion';
+import { useState, useEffect, useRef } from 'react';
+import Link from 'next/link';
+import Image from 'next/image';
+import { createClient } from '@/lib/supabase/client';
+import { useRestaurant } from '@/lib/hooks/useRestaurant';
+import {
+  usePlanLimits,
+  formatLimit,
+  isAtLimit,
+} from '@/lib/hooks/usePlanLimits';
 import {
   Plus,
   Search,
@@ -21,8 +27,10 @@ import {
   Loader2,
   DollarSign,
   Image as ImageIcon,
-} from "lucide-react";
-import { uploadImage } from "@/lib/utils/uploadImage";
+  Crown,
+  ArrowRight,
+} from 'lucide-react';
+import { uploadImage } from '@/lib/utils/uploadImage';
 
 type Category = {
   id: number;
@@ -57,48 +65,54 @@ const stagger = {
 export default function MenuPage() {
   const supabase = createClient();
   const { restaurant, loading: restLoading } = useRestaurant();
+  const { limits } = usePlanLimits(restaurant?.plan);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState<number | "all">("all");
+  const [searchTerm, setSearchTerm] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState<number | 'all'>('all');
   const [modalOpen, setModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<Product | null>(null);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState('');
 
   const [formData, setFormData] = useState({
-    name: "",
-    description: "",
+    name: '',
+    description: '',
     price: 0,
     discount_price: 0,
     category_id: null as number | null,
-    image_url: "",
+    image_url: '',
     available: true,
     featured: false,
   });
+
+  // Plan limits
+  const productCount = products.length;
+  const productLimit = limits?.max_products ?? 30;
+  const atLimit = isAtLimit(productCount, productLimit);
 
   const fetchData = async () => {
     if (!restaurant) return;
     setLoading(true);
 
     const { data: cats } = await supabase
-      .from("categories")
-      .select("id, name, icon")
-      .eq("restaurant_id", restaurant.id)
-      .order("created_at", { ascending: true });
+      .from('categories')
+      .select('id, name, icon')
+      .eq('restaurant_id', restaurant.id)
+      .order('created_at', { ascending: true });
 
     setCategories(cats || []);
 
     const { data: prods, error } = await supabase
-      .from("products")
-      .select("*")
-      .eq("restaurant_id", restaurant.id)
-      .order("created_at", { ascending: false });
+      .from('products')
+      .select('*')
+      .eq('restaurant_id', restaurant.id)
+      .order('created_at', { ascending: false });
 
     if (error) setError(error.message);
     else setProducts(prods || []);
@@ -114,23 +128,29 @@ export default function MenuPage() {
   const filteredProducts = products.filter((p) => {
     const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory =
-      categoryFilter === "all" || p.category_id === categoryFilter;
+      categoryFilter === 'all' || p.category_id === categoryFilter;
     return matchesSearch && matchesCategory;
   });
 
   const openAddModal = () => {
+    if (atLimit) {
+      alert(
+        `وصلت الحد الأقصى (${formatLimit(productLimit)} منتجات على خطة ${restaurant?.plan})`
+      );
+      return;
+    }
     setEditingProduct(null);
     setFormData({
-      name: "",
-      description: "",
+      name: '',
+      description: '',
       price: 0,
       discount_price: 0,
       category_id: categories[0]?.id || null,
-      image_url: "",
+      image_url: '',
       available: true,
       featured: false,
     });
-    setError("");
+    setError('');
     setModalOpen(true);
   };
 
@@ -138,15 +158,15 @@ export default function MenuPage() {
     setEditingProduct(product);
     setFormData({
       name: product.name,
-      description: product.description || "",
+      description: product.description || '',
       price: product.price,
       discount_price: product.discount_price || 0,
       category_id: product.category_id,
-      image_url: product.image_url || "",
+      image_url: product.image_url || '',
       available: product.available,
       featured: product.featured,
     });
-    setError("");
+    setError('');
     setModalOpen(true);
   };
 
@@ -161,14 +181,14 @@ export default function MenuPage() {
     if (url) {
       setFormData({ ...formData, image_url: url });
     } else {
-      setError("Failed to upload image");
+      setError('Failed to upload image');
     }
   };
 
   const saveProduct = async () => {
     if (!formData.name || !formData.price || !restaurant) return;
     setSaving(true);
-    setError("");
+    setError('');
 
     try {
       const payload = {
@@ -185,19 +205,19 @@ export default function MenuPage() {
 
       if (editingProduct) {
         const { error } = await supabase
-          .from("products")
+          .from('products')
           .update(payload)
-          .eq("id", editingProduct.id);
+          .eq('id', editingProduct.id);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from("products").insert(payload);
+        const { error } = await supabase.from('products').insert(payload);
         if (error) throw error;
       }
 
       await fetchData();
       setModalOpen(false);
     } catch (err: any) {
-      setError(err.message || "Failed to save");
+      setError(err.message || 'Failed to save');
     } finally {
       setSaving(false);
     }
@@ -208,28 +228,28 @@ export default function MenuPage() {
     setSaving(true);
     try {
       const { error } = await supabase
-        .from("products")
+        .from('products')
         .delete()
-        .eq("id", deleteConfirm.id);
+        .eq('id', deleteConfirm.id);
       if (error) throw error;
       await fetchData();
       setDeleteConfirm(null);
     } catch (err: any) {
-      setError(err.message || "Failed to delete");
+      setError(err.message || 'Failed to delete');
     } finally {
       setSaving(false);
     }
   };
 
   const toggleAvailable = async (id: number, current: boolean) => {
-    await supabase.from("products").update({ available: !current }).eq("id", id);
+    await supabase.from('products').update({ available: !current }).eq('id', id);
     setProducts((prev) =>
       prev.map((p) => (p.id === id ? { ...p, available: !current } : p))
     );
   };
 
   const toggleFeatured = async (id: number, current: boolean) => {
-    await supabase.from("products").update({ featured: !current }).eq("id", id);
+    await supabase.from('products').update({ featured: !current }).eq('id', id);
     setProducts((prev) =>
       prev.map((p) => (p.id === id ? { ...p, featured: !current } : p))
     );
@@ -269,15 +289,52 @@ export default function MenuPage() {
           </p>
         </div>
         <motion.button
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
+          whileHover={{ scale: atLimit ? 1 : 1.02 }}
+          whileTap={{ scale: atLimit ? 1 : 0.98 }}
           onClick={openAddModal}
-          className="bg-brand hover:bg-brand-dark text-white px-5 py-2.5 rounded-xl text-sm font-semibold shadow-brand transition flex items-center justify-center gap-2"
+          disabled={atLimit}
+          className={`px-5 py-2.5 rounded-xl text-sm font-semibold transition flex items-center justify-center gap-2 ${
+            atLimit
+              ? 'bg-cream text-ink-muted cursor-not-allowed border border-line'
+              : 'bg-brand hover:bg-brand-dark text-white shadow-brand'
+          }`}
         >
           <Plus size={16} />
-          Add Product
+          {atLimit
+            ? `Limit Reached (${productCount}/${formatLimit(productLimit)})`
+            : 'Add Product'}
         </motion.button>
       </motion.div>
+
+      {/* Limit Reached Banner */}
+      {atLimit && (
+        <motion.div
+          variants={fadeInUp}
+          className="bg-amber-custom/10 border border-amber-custom/30 rounded-2xl p-5"
+        >
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-xl bg-amber-custom/20 flex items-center justify-center text-amber-custom shrink-0">
+              <Crown size={20} />
+            </div>
+            <div className="flex-1">
+              <p className="font-bold text-ink">وصلت حد المنتجات</p>
+              <p className="text-sm text-ink-muted mt-1">
+                أنت على خطة{' '}
+                <strong className="text-amber-custom uppercase">
+                  {restaurant?.plan}
+                </strong>{' '}
+                — الحد الأقصى {formatLimit(productLimit)} منتج.
+              </p>
+              <Link
+                href="/pricing"
+                className="inline-flex items-center gap-1 text-sm text-brand font-semibold mt-2 hover:underline"
+              >
+                ترقية للحصول على المزيد <ArrowRight size={14} />
+              </Link>
+            </div>
+          </div>
+        </motion.div>
+      )}
 
       {/* Stats */}
       <motion.div
@@ -325,11 +382,11 @@ export default function MenuPage() {
         </div>
         <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
           <button
-            onClick={() => setCategoryFilter("all")}
+            onClick={() => setCategoryFilter('all')}
             className={`px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition ${
-              categoryFilter === "all"
-                ? "bg-brand text-white shadow-brand"
-                : "bg-cream text-ink-muted hover:text-ink hover:bg-brand/10"
+              categoryFilter === 'all'
+                ? 'bg-brand text-white shadow-brand'
+                : 'bg-cream text-ink-muted hover:text-ink hover:bg-brand/10'
             }`}
           >
             All ({products.length})
@@ -340,11 +397,11 @@ export default function MenuPage() {
               onClick={() => setCategoryFilter(cat.id)}
               className={`px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition flex items-center gap-1.5 ${
                 categoryFilter === cat.id
-                  ? "bg-brand text-white shadow-brand"
-                  : "bg-cream text-ink-muted hover:text-ink hover:bg-brand/10"
+                  ? 'bg-brand text-white shadow-brand'
+                  : 'bg-cream text-ink-muted hover:text-ink hover:bg-brand/10'
               }`}
             >
-              <span>{cat.icon || "🍔"}</span>
+              <span>{cat.icon || '🍔'}</span>
               {cat.name} ({products.filter((p) => p.category_id === cat.id).length})
             </button>
           ))}
@@ -369,7 +426,12 @@ export default function MenuPage() {
               </p>
               <button
                 onClick={openAddModal}
-                className="bg-brand hover:bg-brand-dark text-white px-5 py-2.5 rounded-xl text-sm font-semibold shadow-brand transition inline-flex items-center gap-2"
+                disabled={atLimit}
+                className={`px-5 py-2.5 rounded-xl text-sm font-semibold transition inline-flex items-center gap-2 ${
+                  atLimit
+                    ? 'bg-cream text-ink-muted cursor-not-allowed'
+                    : 'bg-brand hover:bg-brand-dark text-white shadow-brand'
+                }`}
               >
                 <Plus size={16} />
                 Add Product
@@ -390,8 +452,8 @@ export default function MenuPage() {
                   transition={{ delay: i * 0.03 }}
                   className={`bg-surface rounded-2xl border overflow-hidden shadow-soft transition ${
                     product.available
-                      ? "border-line hover:border-brand/40 hover:shadow-brand"
-                      : "border-red-500/20 opacity-60"
+                      ? 'border-line hover:border-brand/40 hover:shadow-brand'
+                      : 'border-red-500/20 opacity-60'
                   }`}
                 >
                   <div className="relative h-40 bg-gradient-to-br from-brand/10 to-brand/5 flex items-center justify-center overflow-hidden">
@@ -429,7 +491,7 @@ export default function MenuPage() {
                       {product.name}
                     </h3>
                     <p className="text-xs text-ink-muted mb-3 line-clamp-2">
-                      {product.description || "—"}
+                      {product.description || '—'}
                     </p>
 
                     <div className="flex items-baseline gap-2 mb-3">
@@ -458,8 +520,8 @@ export default function MenuPage() {
                         }
                         className={`p-2 rounded-lg transition ${
                           product.available
-                            ? "bg-cream hover:bg-amber-custom/10 text-ink-muted hover:text-amber-custom"
-                            : "bg-green-500/10 text-green-600"
+                            ? 'bg-cream hover:bg-amber-custom/10 text-ink-muted hover:text-amber-custom'
+                            : 'bg-green-500/10 text-green-600'
                         }`}
                       >
                         {product.available ? (
@@ -474,8 +536,8 @@ export default function MenuPage() {
                         }
                         className={`p-2 rounded-lg transition ${
                           product.featured
-                            ? "bg-amber-custom/10 text-amber-custom"
-                            : "bg-cream hover:bg-amber-custom/10 text-ink-muted hover:text-amber-custom"
+                            ? 'bg-amber-custom/10 text-amber-custom'
+                            : 'bg-cream hover:bg-amber-custom/10 text-ink-muted hover:text-amber-custom'
                         }`}
                       >
                         {product.featured ? (
@@ -518,7 +580,7 @@ export default function MenuPage() {
             >
               <div className="p-5 border-b border-line flex items-center justify-between sticky top-0 bg-surface z-10">
                 <h2 className="text-lg font-bold text-ink">
-                  {editingProduct ? "Edit Product" : "Add New Product"}
+                  {editingProduct ? 'Edit Product' : 'Add New Product'}
                 </h2>
                 <button
                   onClick={() => setModalOpen(false)}
@@ -535,7 +597,6 @@ export default function MenuPage() {
                   </div>
                 )}
 
-                {/* Image Upload */}
                 <div>
                   <label className="block text-xs text-ink-muted mb-2 font-semibold">
                     Product Image
@@ -615,7 +676,7 @@ export default function MenuPage() {
                     Category
                   </label>
                   <select
-                    value={formData.category_id || ""}
+                    value={formData.category_id || ''}
                     onChange={(e) =>
                       setFormData({
                         ...formData,
@@ -641,7 +702,7 @@ export default function MenuPage() {
                     <input
                       type="number"
                       step="0.01"
-                      value={formData.price || ""}
+                      value={formData.price || ''}
                       onChange={(e) =>
                         setFormData({
                           ...formData,
@@ -659,7 +720,7 @@ export default function MenuPage() {
                     <input
                       type="number"
                       step="0.01"
-                      value={formData.discount_price || ""}
+                      value={formData.discount_price || ''}
                       onChange={(e) =>
                         setFormData({
                           ...formData,
@@ -682,21 +743,21 @@ export default function MenuPage() {
                     }
                     className={`p-3 rounded-xl border text-sm font-semibold transition flex items-center justify-between ${
                       formData.available
-                        ? "bg-green-500/10 border-green-500/30 text-green-600"
-                        : "bg-cream border-line text-ink-muted"
+                        ? 'bg-green-500/10 border-green-500/30 text-green-600'
+                        : 'bg-cream border-line text-ink-muted'
                     }`}
                   >
                     Available
                     <div
                       className={`w-8 h-4 rounded-full transition ${
-                        formData.available ? "bg-green-500" : "bg-gray-300"
+                        formData.available ? 'bg-green-500' : 'bg-gray-300'
                       }`}
                     >
                       <div
                         className={`w-3 h-3 bg-white rounded-full mt-0.5 transition-transform ${
                           formData.available
-                            ? "translate-x-4"
-                            : "translate-x-0.5"
+                            ? 'translate-x-4'
+                            : 'translate-x-0.5'
                         }`}
                       />
                     </div>
@@ -707,21 +768,21 @@ export default function MenuPage() {
                     }
                     className={`p-3 rounded-xl border text-sm font-semibold transition flex items-center justify-between ${
                       formData.featured
-                        ? "bg-amber-custom/10 border-amber-custom/30 text-amber-custom"
-                        : "bg-cream border-line text-ink-muted"
+                        ? 'bg-amber-custom/10 border-amber-custom/30 text-amber-custom'
+                        : 'bg-cream border-line text-ink-muted'
                     }`}
                   >
                     Featured
                     <div
                       className={`w-8 h-4 rounded-full transition ${
-                        formData.featured ? "bg-amber-custom" : "bg-gray-300"
+                        formData.featured ? 'bg-amber-custom' : 'bg-gray-300'
                       }`}
                     >
                       <div
                         className={`w-3 h-3 bg-white rounded-full mt-0.5 transition-transform ${
                           formData.featured
-                            ? "translate-x-4"
-                            : "translate-x-0.5"
+                            ? 'translate-x-4'
+                            : 'translate-x-0.5'
                         }`}
                       />
                     </div>
@@ -743,16 +804,16 @@ export default function MenuPage() {
                   }
                   className={`flex-1 py-3 rounded-xl text-sm font-semibold transition flex items-center justify-center gap-2 ${
                     formData.name && formData.price && !saving && !uploading
-                      ? "bg-brand hover:bg-brand-dark text-white shadow-brand"
-                      : "bg-cream text-ink-muted cursor-not-allowed"
+                      ? 'bg-brand hover:bg-brand-dark text-white shadow-brand'
+                      : 'bg-cream text-ink-muted cursor-not-allowed'
                   }`}
                 >
                   <Save size={16} />
                   {saving
-                    ? "Saving..."
+                    ? 'Saving...'
                     : editingProduct
-                      ? "Save Changes"
-                      : "Add Product"}
+                      ? 'Save Changes'
+                      : 'Add Product'}
                 </button>
               </div>
             </motion.div>
@@ -784,7 +845,7 @@ export default function MenuPage() {
                 Delete Product?
               </h3>
               <p className="text-sm text-ink-muted mb-6">
-                Are you sure you want to delete{" "}
+                Are you sure you want to delete{' '}
                 <span className="font-semibold text-ink">
                   {deleteConfirm.name}
                 </span>
@@ -802,7 +863,7 @@ export default function MenuPage() {
                   disabled={saving}
                   className="flex-1 bg-red-600 hover:bg-red-700 py-3 rounded-xl text-sm font-semibold text-white transition disabled:opacity-50"
                 >
-                  {saving ? "Deleting..." : "Delete"}
+                  {saving ? 'Deleting...' : 'Delete'}
                 </button>
               </div>
             </motion.div>
@@ -816,17 +877,17 @@ export default function MenuPage() {
 function StatBox({
   label,
   value,
-  color = "brand",
+  color = 'brand',
 }: {
   label: string;
   value: number;
-  color?: "brand" | "green" | "amber" | "red";
+  color?: 'brand' | 'green' | 'amber' | 'red';
 }) {
   const colors = {
-    brand: "text-brand",
-    green: "text-green-600",
-    amber: "text-amber-custom",
-    red: "text-red-600",
+    brand: 'text-brand',
+    green: 'text-green-600',
+    amber: 'text-amber-custom',
+    red: 'text-red-600',
   };
   return (
     <div className="bg-surface rounded-2xl p-4 border border-line shadow-soft">
