@@ -29,19 +29,42 @@ import {
   Image as ImageIcon,
   Crown,
   ArrowRight,
+  Layers,
+  Sparkles,
 } from 'lucide-react';
 import { uploadImage } from '@/lib/utils/uploadImage';
 
 type Category = {
-  id: number;
+  id: string;
   name: string;
   icon: string | null;
 };
 
+type ProductAddon = {
+  id: string;
+  product_id: string;
+  name: string;
+  name_ar: string | null;
+  price: number;
+  is_available: boolean;
+  sort_order: number;
+};
+
+type ProductVariant = {
+  id: string;
+  product_id: string;
+  name: string;
+  name_ar: string | null;
+  price: number;
+  is_default: boolean;
+  is_available: boolean;
+  sort_order: number;
+};
+
 type Product = {
-  id: number;
-  restaurant_id: number;
-  category_id: number | null;
+  id: string;
+  restaurant_id: string;
+  category_id: string | null;
   name: string;
   description: string | null;
   price: number;
@@ -50,6 +73,20 @@ type Product = {
   available: boolean;
   featured: boolean;
   created_at: string;
+  addons?: ProductAddon[];
+  variants?: ProductVariant[];
+};
+
+type LocalAddon = {
+  id?: string;
+  name: string;
+  price: number;
+};
+
+type LocalVariant = {
+  id?: string;
+  name: string;
+  price: number;
 };
 
 const fadeInUp = {
@@ -72,7 +109,7 @@ export default function MenuPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState<number | 'all'>('all');
+  const [categoryFilter, setCategoryFilter] = useState<string | 'all'>('all');
   const [modalOpen, setModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<Product | null>(null);
@@ -85,11 +122,14 @@ export default function MenuPage() {
     description: '',
     price: 0,
     discount_price: 0,
-    category_id: null as number | null,
+    category_id: null as string | null,
     image_url: '',
     available: true,
     featured: false,
   });
+
+  const [localAddons, setLocalAddons] = useState<LocalAddon[]>([]);
+  const [localVariants, setLocalVariants] = useState<LocalVariant[]>([]);
 
   // Plan limits
   const productCount = products.length;
@@ -110,7 +150,13 @@ export default function MenuPage() {
 
     const { data: prods, error } = await supabase
       .from('products')
-      .select('*')
+      .select(
+        `
+        *,
+        addons:product_addons(*),
+        variants:product_variants(*)
+      `
+      )
       .eq('restaurant_id', restaurant.id)
       .order('created_at', { ascending: false });
 
@@ -126,7 +172,9 @@ export default function MenuPage() {
   }, [restaurant]);
 
   const filteredProducts = products.filter((p) => {
-    const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = p.name
+      .toLowerCase()
+      .includes(searchTerm.toLowerCase());
     const matchesCategory =
       categoryFilter === 'all' || p.category_id === categoryFilter;
     return matchesSearch && matchesCategory;
@@ -150,6 +198,8 @@ export default function MenuPage() {
       available: true,
       featured: false,
     });
+    setLocalAddons([]);
+    setLocalVariants([]);
     setError('');
     setModalOpen(true);
   };
@@ -166,8 +216,60 @@ export default function MenuPage() {
       available: product.available,
       featured: product.featured,
     });
+    setLocalAddons(
+      (product.addons ?? []).map((a) => ({
+        id: a.id,
+        name: a.name,
+        price: a.price,
+      }))
+    );
+    setLocalVariants(
+      (product.variants ?? []).map((v) => ({
+        id: v.id,
+        name: v.name,
+        price: v.price,
+      }))
+    );
     setError('');
     setModalOpen(true);
+  };
+
+  // ================ Add-ons Handlers ================
+  const addAddon = () => {
+    setLocalAddons([...localAddons, { name: '', price: 0 }]);
+  };
+
+  const updateAddon = (
+    idx: number,
+    field: keyof LocalAddon,
+    value: string | number
+  ) => {
+    setLocalAddons((prev) =>
+      prev.map((a, i) => (i === idx ? { ...a, [field]: value } : a))
+    );
+  };
+
+  const removeAddon = (idx: number) => {
+    setLocalAddons((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  // ================ Variants Handlers ================
+  const addVariant = () => {
+    setLocalVariants([...localVariants, { name: '', price: 0 }]);
+  };
+
+  const updateVariant = (
+    idx: number,
+    field: keyof LocalVariant,
+    value: string | number
+  ) => {
+    setLocalVariants((prev) =>
+      prev.map((v, i) => (i === idx ? { ...v, [field]: value } : v))
+    );
+  };
+
+  const removeVariant = (idx: number) => {
+    setLocalVariants((prev) => prev.filter((_, i) => i !== idx));
   };
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -203,15 +305,74 @@ export default function MenuPage() {
         featured: formData.featured,
       };
 
+      let productId: string;
+
       if (editingProduct) {
         const { error } = await supabase
           .from('products')
           .update(payload)
           .eq('id', editingProduct.id);
         if (error) throw error;
+        productId = editingProduct.id;
       } else {
-        const { error } = await supabase.from('products').insert(payload);
+        const { data, error } = await supabase
+          .from('products')
+          .insert(payload)
+          .select()
+          .single();
         if (error) throw error;
+        productId = data.id;
+      }
+
+      // ============ Save Add-ons ============
+      // احذف القديمة أول
+      if (editingProduct) {
+        await supabase
+          .from('product_addons')
+          .delete()
+          .eq('product_id', productId);
+      }
+
+      // أضف الجديدة (فقط اللي عندها اسم)
+      const validAddons = localAddons.filter((a) => a.name.trim());
+      if (validAddons.length > 0) {
+        const { error: addonsError } = await supabase
+          .from('product_addons')
+          .insert(
+            validAddons.map((a, idx) => ({
+              product_id: productId,
+              name: a.name.trim(),
+              price: a.price || 0,
+              is_available: true,
+              sort_order: idx,
+            }))
+          );
+        if (addonsError) throw addonsError;
+      }
+
+      // ============ Save Variants ============
+      if (editingProduct) {
+        await supabase
+          .from('product_variants')
+          .delete()
+          .eq('product_id', productId);
+      }
+
+      const validVariants = localVariants.filter((v) => v.name.trim());
+      if (validVariants.length > 0) {
+        const { error: variantsError } = await supabase
+          .from('product_variants')
+          .insert(
+            validVariants.map((v, idx) => ({
+              product_id: productId,
+              name: v.name.trim(),
+              price: v.price || formData.price,
+              is_default: idx === 0,
+              is_available: true,
+              sort_order: idx,
+            }))
+          );
+        if (variantsError) throw variantsError;
       }
 
       await fetchData();
@@ -241,14 +402,14 @@ export default function MenuPage() {
     }
   };
 
-  const toggleAvailable = async (id: number, current: boolean) => {
+  const toggleAvailable = async (id: string, current: boolean) => {
     await supabase.from('products').update({ available: !current }).eq('id', id);
     setProducts((prev) =>
       prev.map((p) => (p.id === id ? { ...p, available: !current } : p))
     );
   };
 
-  const toggleFeatured = async (id: number, current: boolean) => {
+  const toggleFeatured = async (id: string, current: boolean) => {
     await supabase.from('products').update({ featured: !current }).eq('id', id);
     setProducts((prev) =>
       prev.map((p) => (p.id === id ? { ...p, featured: !current } : p))
@@ -402,7 +563,8 @@ export default function MenuPage() {
               }`}
             >
               <span>{cat.icon || '🍔'}</span>
-              {cat.name} ({products.filter((p) => p.category_id === cat.id).length})
+              {cat.name} (
+              {products.filter((p) => p.category_id === cat.id).length})
             </button>
           ))}
         </div>
@@ -420,7 +582,9 @@ export default function MenuPage() {
               <div className="w-16 h-16 bg-brand/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
                 <ImageIcon size={24} className="text-brand" />
               </div>
-              <p className="text-ink-muted font-medium mb-1">No products found</p>
+              <p className="text-ink-muted font-medium mb-1">
+                No products found
+              </p>
               <p className="text-xs text-ink-muted/70 mb-4">
                 Add your first product to get started
               </p>
@@ -441,6 +605,8 @@ export default function MenuPage() {
             filteredProducts.map((product, i) => {
               const price = finalPrice(product);
               const discount = discountPercent(product);
+              const addonsCount = product.addons?.length ?? 0;
+              const variantsCount = product.variants?.length ?? 0;
 
               return (
                 <motion.div
@@ -477,8 +643,23 @@ export default function MenuPage() {
                         <Flame size={14} />
                       </span>
                     )}
+                    {/* Badges for addons/variants */}
+                    <div className="absolute bottom-2 left-2 flex gap-1.5 z-10">
+                      {variantsCount > 0 && (
+                        <span className="bg-white/95 backdrop-blur text-brand text-[10px] font-bold px-2 py-1 rounded-full flex items-center gap-1">
+                          <Layers size={10} />
+                          {variantsCount} sizes
+                        </span>
+                      )}
+                      {addonsCount > 0 && (
+                        <span className="bg-white/95 backdrop-blur text-amber-custom text-[10px] font-bold px-2 py-1 rounded-full flex items-center gap-1">
+                          <Sparkles size={10} />
+                          {addonsCount} extras
+                        </span>
+                      )}
+                    </div>
                     {!product.available && (
-                      <div className="absolute inset-0 bg-white/70 backdrop-blur-sm flex items-center justify-center z-10">
+                      <div className="absolute inset-0 bg-white/70 backdrop-blur-sm flex items-center justify-center z-20">
                         <span className="bg-red-500 text-white text-xs font-bold px-3 py-1 rounded-full">
                           Unavailable
                         </span>
@@ -576,7 +757,7 @@ export default function MenuPage() {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
               onClick={(e) => e.stopPropagation()}
-              className="bg-surface rounded-3xl border border-line w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl"
+              className="bg-surface rounded-3xl border border-line w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl"
             >
               <div className="p-5 border-b border-line flex items-center justify-between sticky top-0 bg-surface z-10">
                 <h2 className="text-lg font-bold text-ink">
@@ -597,6 +778,7 @@ export default function MenuPage() {
                   </div>
                 )}
 
+                {/* Image Upload */}
                 <div>
                   <label className="block text-xs text-ink-muted mb-2 font-semibold">
                     Product Image
@@ -680,7 +862,7 @@ export default function MenuPage() {
                     onChange={(e) =>
                       setFormData({
                         ...formData,
-                        category_id: Number(e.target.value),
+                        category_id: e.target.value || null,
                       })
                     }
                     className="w-full bg-white border border-line rounded-xl py-3 px-4 text-sm text-ink focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 transition"
@@ -733,8 +915,154 @@ export default function MenuPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                {/* ============ VARIANTS SECTION ============ */}
+                <div className="border-t border-line pt-4 mt-2">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-lg bg-brand/10 flex items-center justify-center text-brand">
+                        <Layers size={14} />
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-bold text-ink">
+                          الأحجام
+                        </h3>
+                        <p className="text-[10px] text-ink-muted">
+                          صغير، وسط، كبير
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={addVariant}
+                      className="text-xs text-brand font-semibold hover:bg-brand/10 px-2.5 py-1.5 rounded-lg transition flex items-center gap-1"
+                    >
+                      <Plus size={12} /> إضافة
+                    </button>
+                  </div>
+
+                  {localVariants.length === 0 ? (
+                    <p className="text-xs text-ink-muted bg-cream rounded-lg p-3 text-center">
+                      لا توجد أحجام
+                    </p>
+                  ) : (
+                    <div className="space-y-2">
+                      {localVariants.map((v, idx) => (
+                        <div
+                          key={idx}
+                          className="flex gap-2 items-center bg-cream rounded-lg p-2"
+                        >
+                          <input
+                            type="text"
+                            value={v.name}
+                            onChange={(e) =>
+                              updateVariant(idx, 'name', e.target.value)
+                            }
+                            placeholder="اسم (Large)"
+                            className="flex-1 bg-white border border-line rounded-lg px-3 py-2 text-xs text-ink focus:outline-none focus:border-brand"
+                          />
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={v.price || ''}
+                            onChange={(e) =>
+                              updateVariant(
+                                idx,
+                                'price',
+                                Number(e.target.value)
+                              )
+                            }
+                            placeholder="السعر"
+                            className="w-20 bg-white border border-line rounded-lg px-3 py-2 text-xs text-ink focus:outline-none focus:border-brand"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => removeVariant(idx)}
+                            className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* ============ ADD-ONS SECTION ============ */}
+                <div className="border-t border-line pt-4 mt-2">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-lg bg-amber-custom/10 flex items-center justify-center text-amber-custom">
+                        <Sparkles size={14} />
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-bold text-ink">
+                          الإضافات
+                        </h3>
+                        <p className="text-[10px] text-ink-muted">
+                          جبنة، صوص، إلخ
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={addAddon}
+                      className="text-xs text-amber-custom font-semibold hover:bg-amber-custom/10 px-2.5 py-1.5 rounded-lg transition flex items-center gap-1"
+                    >
+                      <Plus size={12} /> إضافة
+                    </button>
+                  </div>
+
+                  {localAddons.length === 0 ? (
+                    <p className="text-xs text-ink-muted bg-cream rounded-lg p-3 text-center">
+                      لا توجد إضافات
+                    </p>
+                  ) : (
+                    <div className="space-y-2">
+                      {localAddons.map((a, idx) => (
+                        <div
+                          key={idx}
+                          className="flex gap-2 items-center bg-cream rounded-lg p-2"
+                        >
+                          <input
+                            type="text"
+                            value={a.name}
+                            onChange={(e) =>
+                              updateAddon(idx, 'name', e.target.value)
+                            }
+                            placeholder="اسم (Extra Cheese)"
+                            className="flex-1 bg-white border border-line rounded-lg px-3 py-2 text-xs text-ink focus:outline-none focus:border-brand"
+                          />
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={a.price || ''}
+                            onChange={(e) =>
+                              updateAddon(
+                                idx,
+                                'price',
+                                Number(e.target.value)
+                              )
+                            }
+                            placeholder="السعر"
+                            className="w-20 bg-white border border-line rounded-lg px-3 py-2 text-xs text-ink focus:outline-none focus:border-brand"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => removeAddon(idx)}
+                            className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Available + Featured */}
+                <div className="grid grid-cols-2 gap-3 pt-2">
                   <button
+                    type="button"
                     onClick={() =>
                       setFormData({
                         ...formData,
@@ -763,6 +1091,7 @@ export default function MenuPage() {
                     </div>
                   </button>
                   <button
+                    type="button"
                     onClick={() =>
                       setFormData({ ...formData, featured: !formData.featured })
                     }

@@ -33,10 +33,8 @@ export default function ProductCard({
       layout
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      onClick={hasOptions ? onOpenDetail : undefined}
-      className={`group bg-surface rounded-2xl shadow-soft hover:shadow-brand border border-line hover:border-brand/30 transition-all p-3 flex gap-3 ${
-        hasOptions ? 'cursor-pointer' : ''
-      }`}
+      onClick={onOpenDetail}
+      className="group bg-surface rounded-2xl shadow-soft hover:shadow-brand border border-line hover:border-brand/30 transition-all p-3 flex gap-3 cursor-pointer"
     >
       {/* Image */}
       <div className="relative w-28 h-28 rounded-xl overflow-hidden bg-cream flex-shrink-0">
@@ -101,11 +99,7 @@ export default function ProductCard({
             whileHover={{ scale: 1.05 }}
             onClick={(e) => {
               e.stopPropagation();
-              if (hasOptions) {
-                onOpenDetail?.();
-              } else {
-                onAdd();
-              }
+              onAdd();
             }}
             className="w-10 h-10 rounded-xl bg-gradient-to-br from-brand to-brand-dark hover:shadow-brand-lg text-white flex items-center justify-center shadow-md transition"
             aria-label="Add to cart"
