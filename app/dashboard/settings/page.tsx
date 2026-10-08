@@ -12,10 +12,12 @@ import {
   DollarSign,
   Link as LinkIcon,
   Check,
+  Palette,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useRestaurant } from '@/lib/hooks/useRestaurant';
 import { uploadImage } from '@/lib/utils/uploadImage';
+import { THEME_PRESETS } from '@/lib/themes';
 
 const supabase = createClient();
 
@@ -37,20 +39,28 @@ type FormState = {
   city: string;
   logo_url: string;
   cover_url: string;
+  favicon_url: string;
   currency: string;
   delivery_fee: number;
   min_order: number;
   is_active: boolean;
   accepts_delivery: boolean;
   accepts_pickup: boolean;
+  // Theme
+  theme_primary: string;
+  theme_accent: string;
+  theme_bg: string;
+  theme_text: string;
+  theme_preset: string;
 };
 
-export default function SettingsPage() {
+ export default function SettingsPage() {
   const { restaurant, loading: restaurantLoading, refresh } = useRestaurant();
   const [form, setForm] = useState<FormState | null>(null);
   const [saving, setSaving] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [uploadingCover, setUploadingCover] = useState(false);
+  const [uploadingFavicon, setUploadingFavicon] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -66,12 +76,18 @@ export default function SettingsPage() {
       city: restaurant.city ?? '',
       logo_url: restaurant.logo_url ?? '',
       cover_url: restaurant.cover_url ?? '',
+      favicon_url: restaurant.favicon_url ?? '',
       currency: restaurant.currency ?? 'USD',
       delivery_fee: restaurant.delivery_fee ?? 0,
       min_order: restaurant.min_order ?? 0,
       is_active: restaurant.is_active ?? true,
       accepts_delivery: restaurant.accepts_delivery ?? true,
       accepts_pickup: restaurant.accepts_pickup ?? true,
+      theme_primary: restaurant.theme_primary ?? '#1C7E84',
+      theme_accent: restaurant.theme_accent ?? '#C9A227',
+      theme_bg: restaurant.theme_bg ?? '#F0EEE9',
+      theme_text: restaurant.theme_text ?? '#1A1A1A',
+      theme_preset: restaurant.theme_preset ?? 'teal',
     });
   }, [restaurant]);
 
@@ -97,10 +113,15 @@ export default function SettingsPage() {
 
   const handleUpload = async (
     file: File,
-    key: 'logo_url' | 'cover_url'
+    key: 'logo_url' | 'cover_url' | 'favicon_url'
   ) => {
     const setUploading =
-      key === 'logo_url' ? setUploadingLogo : setUploadingCover;
+      key === 'logo_url'
+        ? setUploadingLogo
+        : key === 'cover_url'
+          ? setUploadingCover
+          : setUploadingFavicon;
+
     setUploading(true);
     setError(null);
     try {
@@ -115,6 +136,24 @@ export default function SettingsPage() {
     } finally {
       setUploading(false);
     }
+  };
+
+  const applyPreset = (presetId: string) => {
+    const preset = THEME_PRESETS.find((p) => p.id === presetId);
+    if (!preset) return;
+
+    setForm((prev) =>
+      prev
+        ? {
+            ...prev,
+            theme_preset: preset.id,
+            theme_primary: preset.primary,
+            theme_accent: preset.accent,
+            theme_bg: preset.bg,
+            theme_text: preset.text,
+          }
+        : prev
+    );
   };
 
   const handleSave = async () => {
@@ -134,12 +173,18 @@ export default function SettingsPage() {
         city: form.city.trim() || null,
         logo_url: form.logo_url || null,
         cover_url: form.cover_url || null,
+        favicon_url: form.favicon_url || null,
         currency: form.currency,
         delivery_fee: form.delivery_fee,
         min_order: form.min_order,
         is_active: form.is_active,
         accepts_delivery: form.accepts_delivery,
         accepts_pickup: form.accepts_pickup,
+        theme_primary: form.theme_primary,
+        theme_accent: form.theme_accent,
+        theme_bg: form.theme_bg,
+        theme_text: form.theme_text,
+        theme_preset: form.theme_preset,
       })
       .eq('id', restaurant.id);
 
@@ -157,6 +202,7 @@ export default function SettingsPage() {
 
   return (
     <div className="min-h-screen bg-cream p-4 md:p-6">
+      {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-ink">Settings</h1>
@@ -195,7 +241,9 @@ export default function SettingsPage() {
       )}
 
       <div className="grid lg:grid-cols-3 gap-6">
+        {/* ============ LEFT: MAIN FORM ============ */}
         <div className="lg:col-span-2 space-y-6">
+          {/* Basic Info */}
           <Section icon={<Store size={18} />} title="Basic Information">
             <Field label="Restaurant Name (EN) *">
               <input
@@ -231,6 +279,7 @@ export default function SettingsPage() {
             </Field>
           </Section>
 
+          {/* Contact */}
           <Section icon={<Phone size={18} />} title="Contact">
             <div className="grid md:grid-cols-2 gap-4">
               <Field label="Phone">
@@ -258,6 +307,179 @@ export default function SettingsPage() {
             </Field>
           </Section>
 
+          {/* Theme Customization */}
+          <Section icon={<Palette size={18} />} title="Menu Appearance">
+            <Field label="Theme Presets">
+              <div className="grid grid-cols-4 gap-2">
+                {THEME_PRESETS.map((preset) => {
+                  const isActive = form.theme_preset === preset.id;
+                  return (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      onClick={() => applyPreset(preset.id)}
+                      className={`relative p-2 rounded-xl border-2 transition ${
+                        isActive
+                          ? 'border-brand shadow-brand'
+                          : 'border-line hover:border-brand/30'
+                      }`}
+                      title={preset.name_ar}
+                    >
+                      <div className="flex gap-1 mb-1.5">
+                        <div
+                          className="flex-1 h-6 rounded-md"
+                          style={{ backgroundColor: preset.primary }}
+                        />
+                        <div
+                          className="w-3 h-6 rounded-md"
+                          style={{ backgroundColor: preset.accent }}
+                        />
+                      </div>
+                      <div
+                        className="w-full h-2 rounded-md"
+                        style={{ backgroundColor: preset.bg }}
+                      />
+                      {isActive && (
+                        <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-brand flex items-center justify-center">
+                          <Check size={10} className="text-white" />
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </Field>
+
+            {/* Custom Colors */}
+            <div className="grid grid-cols-2 gap-4 pt-2">
+              <Field label="Primary Color">
+                <div className="flex gap-2 items-center">
+                  <input
+                    type="color"
+                    value={form.theme_primary}
+                    onChange={(e) => update('theme_primary', e.target.value)}
+                    className="w-12 h-12 rounded-xl cursor-pointer border border-line shrink-0"
+                  />
+                  <input
+                    type="text"
+                    value={form.theme_primary}
+                    onChange={(e) => update('theme_primary', e.target.value)}
+                    className="flex-1 bg-white border border-line rounded-xl px-3 py-2.5 text-sm font-mono text-ink focus:outline-none focus:border-brand"
+                  />
+                </div>
+              </Field>
+
+              <Field label="Accent Color">
+                <div className="flex gap-2 items-center">
+                  <input
+                    type="color"
+                    value={form.theme_accent}
+                    onChange={(e) => update('theme_accent', e.target.value)}
+                    className="w-12 h-12 rounded-xl cursor-pointer border border-line shrink-0"
+                  />
+                  <input
+                    type="text"
+                    value={form.theme_accent}
+                    onChange={(e) => update('theme_accent', e.target.value)}
+                    className="flex-1 bg-white border border-line rounded-xl px-3 py-2.5 text-sm font-mono text-ink focus:outline-none focus:border-brand"
+                  />
+                </div>
+              </Field>
+
+              <Field label="Background Color">
+                <div className="flex gap-2 items-center">
+                  <input
+                    type="color"
+                    value={form.theme_bg}
+                    onChange={(e) => update('theme_bg', e.target.value)}
+                    className="w-12 h-12 rounded-xl cursor-pointer border border-line shrink-0"
+                  />
+                  <input
+                    type="text"
+                    value={form.theme_bg}
+                    onChange={(e) => update('theme_bg', e.target.value)}
+                    className="flex-1 bg-white border border-line rounded-xl px-3 py-2.5 text-sm font-mono text-ink focus:outline-none focus:border-brand"
+                  />
+                </div>
+              </Field>
+
+              <Field label="Text Color">
+                <div className="flex gap-2 items-center">
+                  <input
+                    type="color"
+                    value={form.theme_text}
+                    onChange={(e) => update('theme_text', e.target.value)}
+                    className="w-12 h-12 rounded-xl cursor-pointer border border-line shrink-0"
+                  />
+                  <input
+                    type="text"
+                    value={form.theme_text}
+                    onChange={(e) => update('theme_text', e.target.value)}
+                    className="flex-1 bg-white border border-line rounded-xl px-3 py-2.5 text-sm font-mono text-ink focus:outline-none focus:border-brand"
+                  />
+                </div>
+              </Field>
+            </div>
+
+            {/* Live Preview */}
+            <Field label="Live Preview">
+              <div
+                className="rounded-2xl p-5 border border-line"
+                style={{ backgroundColor: form.theme_bg }}
+              >
+                <div className="flex items-center gap-3 mb-4">
+                  <div
+                    className="w-12 h-12 rounded-full flex items-center justify-center text-2xl"
+                    style={{ backgroundColor: form.theme_primary }}
+                  >
+                    🍽️
+                  </div>
+                  <div>
+                    <p
+                      className="font-bold text-base"
+                      style={{ color: form.theme_text }}
+                    >
+                      {form.name_ar || form.name || 'اسم المطعم'}
+                    </p>
+                    <p
+                      className="text-xs"
+                      style={{
+                        color: `color-mix(in srgb, ${form.theme_text} 60%, transparent)`,
+                      }}
+                    >
+                      📍 {form.city || 'المدينة'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex gap-2 flex-wrap">
+                  <button
+                    className="px-4 py-2 rounded-lg text-white text-xs font-bold shadow"
+                    style={{ backgroundColor: form.theme_primary }}
+                  >
+                    زر أساسي
+                  </button>
+                  <button
+                    className="px-4 py-2 rounded-lg text-white text-xs font-bold shadow"
+                    style={{ backgroundColor: form.theme_accent }}
+                  >
+                    زر تمييزي
+                  </button>
+                </div>
+
+                <div className="mt-4 p-3 rounded-xl bg-white/50 backdrop-blur">
+                  <p
+                    className="text-xs font-medium"
+                    style={{ color: form.theme_text }}
+                  >
+                    معاينة حية — كل التغييرات تنعكس فوراً
+                  </p>
+                </div>
+              </div>
+            </Field>
+          </Section>
+
+          {/* Delivery */}
           <Section icon={<Truck size={18} />} title="Delivery & Pickup">
             <div className="grid md:grid-cols-2 gap-4">
               <Field label="Delivery Fee">
@@ -306,6 +528,7 @@ export default function SettingsPage() {
             </div>
           </Section>
 
+          {/* Currency */}
           <Section icon={<DollarSign size={18} />} title="Currency">
             <Field label="Menu Currency">
               <select
@@ -323,7 +546,9 @@ export default function SettingsPage() {
           </Section>
         </div>
 
+        {/* ============ RIGHT: MEDIA ============ */}
         <div className="space-y-6">
+          {/* Logo */}
           <Section icon={<ImageIcon size={18} />} title="Logo">
             <div className="flex flex-col items-center gap-4">
               {form.logo_url ? (
@@ -353,6 +578,7 @@ export default function SettingsPage() {
             </div>
           </Section>
 
+          {/* Cover */}
           <Section icon={<ImageIcon size={18} />} title="Cover">
             <div className="flex flex-col items-center gap-4">
               {form.cover_url ? (
@@ -382,6 +608,41 @@ export default function SettingsPage() {
             </div>
           </Section>
 
+          {/* Favicon */}
+          <Section icon={<ImageIcon size={18} />} title="Favicon">
+            <div className="flex flex-col items-center gap-4">
+              {form.favicon_url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={form.favicon_url}
+                  alt="Favicon"
+                  className="w-16 h-16 rounded-xl object-cover border border-line"
+                />
+              ) : (
+                <div className="w-16 h-16 rounded-xl bg-cream border border-dashed border-line flex items-center justify-center text-2xl">
+                  🔖
+                </div>
+              )}
+              <label className="cursor-pointer text-sm px-4 py-2 rounded-lg bg-cream hover:bg-brand/10 transition text-ink font-medium">
+                {uploadingFavicon ? 'Uploading...' : 'Upload Favicon'}
+                <input
+                  type="file"
+                  accept="image/*"
+                  hidden
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) handleUpload(f, 'favicon_url');
+                  }}
+                />
+              </label>
+              <p className="text-xs text-ink-muted text-center leading-relaxed">
+                تظهر بجانب اسم المطعم في تبويب المتصفح. الأفضل أن تكون صورة
+                مربعة 64×64.
+              </p>
+            </div>
+          </Section>
+
+          {/* Public URL */}
           <Section icon={<LinkIcon size={18} />} title="Public URL">
             <div className="text-sm">
               <p className="text-ink-muted mb-2">Your menu is at:</p>
@@ -419,6 +680,8 @@ export default function SettingsPage() {
     </div>
   );
 }
+
+/* ============ SUB-COMPONENTS ============ */
 
 function Section({
   icon,

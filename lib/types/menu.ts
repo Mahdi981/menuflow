@@ -23,6 +23,12 @@ export type Restaurant = {
   working_hours: any;
   plan: 'starter' | 'professional' | 'business';
   created_at: string;
+   theme_primary: string | null;
+  theme_accent: string | null;
+  theme_bg: string | null;
+  theme_text: string | null;
+  theme_preset: string | null;
+  favicon_url: string | null;
 };
 
 // ============================================

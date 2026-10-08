@@ -25,6 +25,13 @@ export type Restaurant = {
   working_hours: any;
   plan: string;
   created_at: string;
+  // ⬇️ جديد
+  theme_primary: string | null;
+  theme_accent: string | null;
+  theme_bg: string | null;
+  theme_text: string | null;
+  theme_preset: string | null;
+  favicon_url: string | null;
 };
 
 export function useRestaurant() {

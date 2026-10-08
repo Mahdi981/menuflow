@@ -40,8 +40,26 @@ export default function MenuClient({ menu }: { menu: FullMenu }) {
   const current =
     allCategories.find((c) => c.id === activeCat) ?? allCategories[0];
 
+  // ألوان Theme
+  const themePrimary = menu.theme_primary ?? '#1C7E84';
+  const themeAccent = menu.theme_accent ?? '#C9A227';
+  const themeBg = menu.theme_bg ?? '#F0EEE9';
+  const themeText = menu.theme_text ?? '#1A1A1A';
+
   return (
-    <div className="min-h-screen bg-cream pb-28">
+    <div
+      className="min-h-screen pb-28"
+      style={
+        {
+          backgroundColor: themeBg,
+          color: themeText,
+          '--color-brand': themePrimary,
+          '--color-amber-custom': themeAccent,
+          '--color-cream': themeBg,
+          '--color-ink': themeText,
+        } as React.CSSProperties
+      }
+    >
       <MenuHeader restaurant={menu} />
 
       <CategoryTabs
@@ -53,11 +71,24 @@ export default function MenuClient({ menu }: { menu: FullMenu }) {
       <div className="max-w-3xl mx-auto px-4 py-6 space-y-3">
         {current && (
           <div className="flex items-center gap-3 mb-2">
-            <h2 className="text-lg font-bold text-ink">
+            <h2
+              className="text-lg font-bold"
+              style={{ color: themeText }}
+            >
               {current.name_ar ?? current.name}
             </h2>
-            <div className="flex-1 h-px bg-line" />
-            <span className="text-xs text-ink-muted font-medium">
+            <div
+              className="flex-1 h-px"
+              style={{
+                backgroundColor: `color-mix(in srgb, ${themeText} 20%, transparent)`,
+              }}
+            />
+            <span
+              className="text-xs font-medium"
+              style={{
+                color: `color-mix(in srgb, ${themeText} 60%, transparent)`,
+              }}
+            >
               {current.products.length} item
               {current.products.length !== 1 ? 's' : ''}
             </span>
@@ -66,10 +97,17 @@ export default function MenuClient({ menu }: { menu: FullMenu }) {
 
         {current?.products.length === 0 && (
           <div className="text-center py-16">
-            <div className="w-16 h-16 rounded-2xl bg-surface mx-auto flex items-center justify-center text-3xl shadow-soft mb-4">
+            <div className="w-16 h-16 rounded-2xl bg-white mx-auto flex items-center justify-center text-3xl shadow-soft mb-4">
               🍽️
             </div>
-            <p className="text-ink-muted font-medium">No items yet</p>
+            <p
+              className="font-medium"
+              style={{
+                color: `color-mix(in srgb, ${themeText} 60%, transparent)`,
+              }}
+            >
+              No items yet
+            </p>
           </div>
         )}
 
