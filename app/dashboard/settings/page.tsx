@@ -1,8 +1,7 @@
 'use client';
 
 export const dynamic = 'force-dynamic';
-
-// ... باقي الـ imports والكود
+export const revalidate = 0;
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
