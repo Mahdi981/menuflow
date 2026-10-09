@@ -24,7 +24,6 @@ import {
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useRestaurant } from '@/lib/hooks/useRestaurant';
-import type { Restaurant } from '@/lib/hooks/useRestaurant';
 import { useSubscription } from '@/lib/hooks/useSubscription';
 import { uploadImage } from '@/lib/utils/uploadImage';
 import { THEME_PRESETS } from '@/lib/themes';
@@ -34,14 +33,6 @@ import {
   DAY_LABELS_AR,
   type WorkingHours,
 } from '@/lib/types/hours';
-
-
-const supabase = createClient();
-const { restaurant, loading: restaurantLoading, refresh } = useRestaurant();
-
-const { subscription, isTrialActive, trialDaysLeft } = useSubscription(
-  restaurant?.id
-);
 
 const CURRENCIES = [
   { code: 'USD', label: 'USD — US Dollar ($)' },
@@ -68,7 +59,6 @@ type FormState = {
   is_active: boolean;
   accepts_delivery: boolean;
   accepts_pickup: boolean;
-  // Theme
   theme_primary: string;
   theme_accent: string;
   theme_bg: string;
@@ -77,8 +67,12 @@ type FormState = {
   working_hours: WorkingHours;
 };
 
- export default function SettingsPage() {
+export default function SettingsPage() {
   const { restaurant, loading: restaurantLoading, refresh } = useRestaurant();
+  const { subscription, isTrialActive, trialDaysLeft } = useSubscription(
+    restaurant?.id
+  );
+
   const [form, setForm] = useState<FormState | null>(null);
   const [saving, setSaving] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
@@ -90,7 +84,6 @@ type FormState = {
   useEffect(() => {
     if (!restaurant) return;
     setForm({
-      
       name: restaurant.name ?? '',
       name_ar: restaurant.name_ar ?? '',
       description: restaurant.description ?? '',
@@ -112,7 +105,8 @@ type FormState = {
       theme_bg: restaurant.theme_bg ?? '#F0EEE9',
       theme_text: restaurant.theme_text ?? '#1A1A1A',
       theme_preset: restaurant.theme_preset ?? 'teal',
-      working_hours: restaurant.working_hours ?? DEFAULT_HOURS,
+      working_hours:
+        (restaurant.working_hours as WorkingHours) ?? DEFAULT_HOURS,
     });
   }, [restaurant]);
 
@@ -182,9 +176,13 @@ type FormState = {
   };
 
   const handleSave = async () => {
+    if (!form || !restaurant) return;
+
     setSaving(true);
     setError(null);
     setSuccess(false);
+
+    const supabase = createClient();
 
     const { error: updateError } = await supabase
       .from('restaurants')
@@ -267,7 +265,7 @@ type FormState = {
       )}
 
       <div className="grid lg:grid-cols-3 gap-6">
-        {/* ============ LEFT: MAIN FORM ============ */}
+        {/* LEFT: MAIN FORM */}
         <div className="lg:col-span-2 space-y-6">
           {/* Basic Info */}
           <Section icon={<Store size={18} />} title="Basic Information">
@@ -333,7 +331,7 @@ type FormState = {
             </Field>
           </Section>
 
-          {/* Theme Customization */}
+          {/* Theme */}
           <Section icon={<Palette size={18} />} title="Menu Appearance">
             <Field label="Theme Presets">
               <div className="grid grid-cols-4 gap-2">
@@ -376,7 +374,6 @@ type FormState = {
               </div>
             </Field>
 
-            {/* Custom Colors */}
             <div className="grid grid-cols-2 gap-4 pt-2">
               <Field label="Primary Color">
                 <div className="flex gap-2 items-center">
@@ -447,7 +444,6 @@ type FormState = {
               </Field>
             </div>
 
-            {/* Live Preview */}
             <Field label="Live Preview">
               <div
                 className="rounded-2xl p-5 border border-line"
@@ -555,115 +551,127 @@ type FormState = {
           </Section>
 
           {/* Working Hours */}
-<Section icon={<Clock size={18} />} title="Working Hours">
-  <div className="space-y-2">
-    {(Object.keys(DAY_LABELS) as (keyof WorkingHours)[]).map((day) => {
-      const dayHours = form.working_hours[day];
-      return (
-        <div
-          key={day}
-          className="flex flex-col sm:flex-row sm:items-center gap-3 p-3 rounded-xl bg-cream"
-        >
-          <div className="flex items-center gap-2 sm:w-32 shrink-0">
-            <button
-              type="button"
-              onClick={() => {
-                const newHours = { ...form.working_hours };
-                newHours[day] = { ...dayHours, closed: !dayHours.closed };
-                update('working_hours', newHours);
-              }}
-              className={`relative w-10 h-6 rounded-full transition shrink-0 ${
-                dayHours.closed ? 'bg-gray-300' : 'bg-green-500'
-              }`}
-              title={dayHours.closed ? 'مغلق' : 'مفتوح'}
-            >
-              <span
-                className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all ${
-                  dayHours.closed ? 'left-0.5' : 'left-[18px]'
-                }`}
-              />
-            </button>
-            <div>
-              <p className="text-sm font-semibold text-ink">
-                {DAY_LABELS[day]}
-              </p>
-              <p className="text-[10px] text-ink-muted">
-                {DAY_LABELS_AR[day]}
-              </p>
+          <Section icon={<Clock size={18} />} title="Working Hours">
+            <div className="space-y-2">
+              {(Object.keys(DAY_LABELS) as (keyof WorkingHours)[]).map((day) => {
+                const dayHours = form.working_hours[day];
+                return (
+                  <div
+                    key={day}
+                    className="flex flex-col sm:flex-row sm:items-center gap-3 p-3 rounded-xl bg-cream"
+                  >
+                    <div className="flex items-center gap-2 sm:w-32 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const newHours = { ...form.working_hours };
+                          newHours[day] = {
+                            ...dayHours,
+                            closed: !dayHours.closed,
+                          };
+                          update('working_hours', newHours);
+                        }}
+                        className={`relative w-10 h-6 rounded-full transition shrink-0 ${
+                          dayHours.closed ? 'bg-gray-300' : 'bg-green-500'
+                        }`}
+                      >
+                        <span
+                          className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all ${
+                            dayHours.closed ? 'left-0.5' : 'left-[18px]'
+                          }`}
+                        />
+                      </button>
+                      <div>
+                        <p className="text-sm font-semibold text-ink">
+                          {DAY_LABELS[day]}
+                        </p>
+                        <p className="text-[10px] text-ink-muted">
+                          {DAY_LABELS_AR[day]}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex-1 flex items-center gap-2">
+                      {dayHours.closed ? (
+                        <p className="text-sm text-ink-muted italic px-2">
+                          مغلق
+                        </p>
+                      ) : (
+                        <>
+                          <input
+                            type="time"
+                            value={dayHours.open}
+                            onChange={(e) => {
+                              const newHours = { ...form.working_hours };
+                              newHours[day] = {
+                                ...dayHours,
+                                open: e.target.value,
+                              };
+                              update('working_hours', newHours);
+                            }}
+                            className="flex-1 bg-white border border-line rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:border-brand font-mono"
+                          />
+                          <span className="text-ink-muted text-sm shrink-0">
+                            —
+                          </span>
+                          <input
+                            type="time"
+                            value={dayHours.close}
+                            onChange={(e) => {
+                              const newHours = { ...form.working_hours };
+                              newHours[day] = {
+                                ...dayHours,
+                                close: e.target.value,
+                              };
+                              update('working_hours', newHours);
+                            }}
+                            className="flex-1 bg-white border border-line rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:border-brand font-mono"
+                          />
+                        </>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-          </div>
 
-          <div className="flex-1 flex items-center gap-2">
-            {dayHours.closed ? (
-              <p className="text-sm text-ink-muted italic px-2">مغلق</p>
-            ) : (
-              <>
-                <input
-                  type="time"
-                  value={dayHours.open}
-                  onChange={(e) => {
-                    const newHours = { ...form.working_hours };
-                    newHours[day] = { ...dayHours, open: e.target.value };
-                    update('working_hours', newHours);
-                  }}
-                  className="flex-1 bg-white border border-line rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:border-brand font-mono"
-                />
-                <span className="text-ink-muted text-sm shrink-0">—</span>
-                <input
-                  type="time"
-                  value={dayHours.close}
-                  onChange={(e) => {
-                    const newHours = { ...form.working_hours };
-                    newHours[day] = { ...dayHours, close: e.target.value };
-                    update('working_hours', newHours);
-                  }}
-                  className="flex-1 bg-white border border-line rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:border-brand font-mono"
-                />
-              </>
-            )}
-          </div>
-        </div>
-      );
-    })}
-  </div>
-
-  <div className="flex gap-2 pt-2">
-    <button
-      type="button"
-      onClick={() => {
-        const newHours = { ...DEFAULT_HOURS };
-        Object.keys(newHours).forEach((k) => {
-          newHours[k as keyof WorkingHours] = {
-            open: '09:00',
-            close: '23:00',
-            closed: false,
-          };
-        });
-        update('working_hours', newHours);
-      }}
-      className="flex-1 px-3 py-2 rounded-lg bg-cream hover:bg-brand/10 text-xs font-semibold text-ink transition"
-    >
-      فتح كل الأيام
-    </button>
-    <button
-      type="button"
-      onClick={() => {
-        const newHours = { ...DEFAULT_HOURS };
-        Object.keys(newHours).forEach((k) => {
-          newHours[k as keyof WorkingHours] = {
-            open: '09:00',
-            close: '23:00',
-            closed: true,
-          };
-        });
-        update('working_hours', newHours);
-      }}
-      className="flex-1 px-3 py-2 rounded-lg bg-cream hover:bg-red-500/10 text-xs font-semibold text-ink transition"
-    >
-      إغلاق كل الأيام
-    </button>
-  </div>
-</Section>
+            <div className="flex gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  const newHours = { ...DEFAULT_HOURS };
+                  Object.keys(newHours).forEach((k) => {
+                    newHours[k as keyof WorkingHours] = {
+                      open: '09:00',
+                      close: '23:00',
+                      closed: false,
+                    };
+                  });
+                  update('working_hours', newHours);
+                }}
+                className="flex-1 px-3 py-2 rounded-lg bg-cream hover:bg-brand/10 text-xs font-semibold text-ink transition"
+              >
+                فتح كل الأيام
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const newHours = { ...DEFAULT_HOURS };
+                  Object.keys(newHours).forEach((k) => {
+                    newHours[k as keyof WorkingHours] = {
+                      open: '09:00',
+                      close: '23:00',
+                      closed: true,
+                    };
+                  });
+                  update('working_hours', newHours);
+                }}
+                className="flex-1 px-3 py-2 rounded-lg bg-cream hover:bg-red-500/10 text-xs font-semibold text-ink transition"
+              >
+                إغلاق كل الأيام
+              </button>
+            </div>
+          </Section>
 
           {/* Currency */}
           <Section icon={<DollarSign size={18} />} title="Currency">
@@ -683,7 +691,7 @@ type FormState = {
           </Section>
         </div>
 
-        {/* ============ RIGHT: MEDIA ============ */}
+        {/* RIGHT: MEDIA */}
         <div className="space-y-6">
           {/* Logo */}
           <Section icon={<ImageIcon size={18} />} title="Logo">
@@ -778,97 +786,91 @@ type FormState = {
               </p>
             </div>
           </Section>
+
+          {/* Subscription */}
           <Section icon={<CreditCard size={18} />} title="Subscription">
-  {!subscription ? (
-    <div className="text-center py-6">
-      <div className="w-12 h-12 rounded-xl bg-cream mx-auto flex items-center justify-center mb-3">
-        <Crown size={20} className="text-brand" />
-      </div>
-      <p className="text-sm text-ink-muted mb-3">
-        You're on the Free Starter plan
-      </p>
-      <Link
-        href="/pricing"
-        className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-brand hover:bg-brand-dark text-white text-sm font-semibold shadow-brand transition"
-      >
-        Upgrade Plan
-        <ArrowRight size={14} />
-      </Link>
-    </div>
-  ) : (
-    <div className="space-y-3">
-      {/* Plan */}
-      <div className="flex items-center justify-between p-3 rounded-xl bg-cream">
-        <div>
-          <p className="text-xs text-ink-muted uppercase tracking-wider">
-            Current Plan
-          </p>
-          <p className="font-bold text-brand uppercase">
-            {subscription.plan}
-          </p>
-        </div>
-        <span
-          className={`text-xs font-bold px-2.5 py-1 rounded-full border ${
-            subscription.status === 'active'
-              ? 'bg-green-500/10 text-green-600 border-green-500/30'
-              : subscription.status === 'trial'
-                ? 'bg-amber-custom/10 text-amber-custom border-amber-custom/30'
-                : 'bg-red-500/10 text-red-600 border-red-500/30'
-          }`}
-        >
-          {subscription.status === 'active'
-            ? 'Active'
-            : subscription.status === 'trial'
-              ? `Trial — ${trialDaysLeft}d left`
-              : subscription.status}
-        </span>
-      </div>
+            {!subscription ? (
+              <div className="text-center py-6">
+                <div className="w-12 h-12 rounded-xl bg-cream mx-auto flex items-center justify-center mb-3">
+                  <Crown size={20} className="text-brand" />
+                </div>
+                <p className="text-sm text-ink-muted mb-3">
+                  You're on the Free Starter plan
+                </p>
+                <Link
+                  href="/pricing"
+                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-brand hover:bg-brand-dark text-white text-sm font-semibold shadow-brand transition"
+                >
+                  Upgrade Plan
+                  <ArrowRight size={14} />
+                </Link>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between p-3 rounded-xl bg-cream">
+                  <div>
+                    <p className="text-xs text-ink-muted uppercase tracking-wider">
+                      Current Plan
+                    </p>
+                    <p className="font-bold text-brand uppercase">
+                      {subscription.plan}
+                    </p>
+                  </div>
+                  <span
+                    className={`text-xs font-bold px-2.5 py-1 rounded-full border ${
+                      subscription.status === 'active'
+                        ? 'bg-green-500/10 text-green-600 border-green-500/30'
+                        : subscription.status === 'trial'
+                          ? 'bg-amber-custom/10 text-amber-custom border-amber-custom/30'
+                          : 'bg-red-500/10 text-red-600 border-red-500/30'
+                    }`}
+                  >
+                    {subscription.status === 'active'
+                      ? 'Active'
+                      : subscription.status === 'trial'
+                        ? `Trial — ${trialDaysLeft}d left`
+                        : subscription.status}
+                  </span>
+                </div>
 
-      {/* Price */}
-      <div className="flex items-center justify-between p-3 rounded-xl bg-cream">
-        <div>
-          <p className="text-xs text-ink-muted uppercase tracking-wider">
-            Price
-          </p>
-          <p className="font-bold text-ink">
-            ${subscription.price_usd} / month
-          </p>
-        </div>
-      </div>
+                <div className="flex items-center justify-between p-3 rounded-xl bg-cream">
+                  <div>
+                    <p className="text-xs text-ink-muted uppercase tracking-wider">
+                      Price
+                    </p>
+                    <p className="font-bold text-ink">
+                      ${subscription.price_usd} / month
+                    </p>
+                  </div>
+                </div>
 
-      {/* Period end */}
-      {subscription.current_period_end && (
-        <div className="flex items-center justify-between p-3 rounded-xl bg-cream">
-          <div>
-            <p className="text-xs text-ink-muted uppercase tracking-wider">
-              {subscription.status === 'active' ? 'Renews' : 'Ends'}
-            </p>
-            <p className="font-bold text-ink">
-              {new Date(subscription.current_period_end).toLocaleDateString()}
-            </p>
-          </div>
-        </div>
-      )}
+                {subscription.current_period_end && (
+                  <div className="flex items-center justify-between p-3 rounded-xl bg-cream">
+                    <div>
+                      <p className="text-xs text-ink-muted uppercase tracking-wider">
+                        {subscription.status === 'active' ? 'Renews' : 'Ends'}
+                      </p>
+                      <p className="font-bold text-ink">
+                        {new Date(
+                          subscription.current_period_end
+                        ).toLocaleDateString()}
+                      </p>
+                    </div>
+                  </div>
+                )}
 
-      {/* Manage */}
-      <a
-        href="https://app.dodopayments.com/"
-        target="_blank"
-        rel="noopener noreferrer"
-        className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-brand/5 hover:bg-brand/10 border border-brand/20 text-brand font-semibold text-sm transition"
-      >
-        Manage Subscription
-        <ExternalLink size={14} />
-      </a>
-
-      {subscription.status === 'active' && (
-        <p className="text-xs text-ink-muted text-center">
-          لإلغاء الاشتراك، استخدم زر "Manage Subscription" أعلاه
-        </p>
-      )}
-    </div>
-  )}
-</Section>
+                <a
+                  href="https://app.dodopayments.com/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-brand/5 hover:bg-brand/10 border border-brand/20 text-brand font-semibold text-sm transition"
+                >
+                  Manage Subscription
+                  <ExternalLink size={14} />
+                </a>
+              </div>
+            )}
+          </Section>
 
           {/* Public URL */}
           <Section icon={<LinkIcon size={18} />} title="Public URL">
