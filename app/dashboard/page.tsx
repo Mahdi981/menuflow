@@ -15,15 +15,9 @@ import {
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useRestaurant } from '@/lib/hooks/useRestaurant';
-import {
-  usePlanLimits,
-  formatLimit,
-} from '@/lib/hooks/usePlanLimits';
-
+import { usePlanLimits, formatLimit } from '@/lib/hooks/usePlanLimits';
 import { useSubscription } from '@/lib/hooks/useSubscription';
 import UpgradeBanner from '@/components/UpgradeBanner';
-
-const supabase = createClient();
 
 type Stats = {
   todayOrders: number;
@@ -35,21 +29,20 @@ type Stats = {
   totalOrders: number;
 };
 
+type Order = {
+  id?: string;
+  total?: number | string | null;
+  status?: string | null;
+  customer_phone?: string | null;
+  created_at: string;
+};
+
 export default function OverviewPage() {
   const { restaurant, loading: restaurantLoading } = useRestaurant();
   const { limits } = usePlanLimits(restaurant?.plan);
-  const {
-  subscription,
-  isTrialActive,
-  trialDaysLeft,
-} = useSubscription(restaurant?.id);
-
-{/* Upgrade / Trial Banner */}
-<UpgradeBanner
-  subscription={subscription}
-  isTrialActive={isTrialActive}
-  trialDaysLeft={trialDaysLeft}
-/>
+  const { subscription, isTrialActive, trialDaysLeft } = useSubscription(
+    restaurant?.id
+  );
 
   const [stats, setStats] = useState<Stats>({
     todayOrders: 0,
@@ -61,7 +54,7 @@ export default function OverviewPage() {
     totalOrders: 0,
   });
   const [loading, setLoading] = useState(true);
-  const [recentOrders, setRecentOrders] = useState<any[]>([]);
+  const [recentOrders, setRecentOrders] = useState<Order[]>([]);
 
   useEffect(() => {
     if (!restaurant?.id) return;
@@ -70,6 +63,8 @@ export default function OverviewPage() {
 
     const fetchStats = async () => {
       setLoading(true);
+      const supabase = createClient();  // ✅ هون، داخل useEffect
+
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
@@ -90,11 +85,13 @@ export default function OverviewPage() {
 
       if (cancelled) return;
 
-      const orders = ordersRes.data ?? [];
-      const todayOrders = orders.filter((o) => new Date(o.created_at) >= today);
+      const orders = (ordersRes.data ?? []) as Order[];
+      const todayOrders = orders.filter(
+        (o) => new Date(o.created_at) >= today
+      );
       const todayRevenue = todayOrders
         .filter((o) => o.status !== 'cancelled')
-        .reduce((s, o) => s + Number(o.total || 0), 0);
+        .reduce((s: number, o: Order) => s + Number(o.total || 0), 0);
       const uniqueCustomers = new Set(
         orders.map((o) => o.customer_phone).filter(Boolean)
       ).size;
@@ -114,7 +111,8 @@ export default function OverviewPage() {
         [...orders]
           .sort(
             (a, b) =>
-              new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+              new Date(b.created_at).getTime() -
+              new Date(a.created_at).getTime()
           )
           .slice(0, 5)
       );
@@ -123,13 +121,13 @@ export default function OverviewPage() {
     };
 
     fetchStats();
+
     return () => {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [restaurant?.id]);
 
-  // ⚠️ فقط انتظر تحميل restaurant
   if (restaurantLoading) {
     return (
       <div className="min-h-screen bg-cream p-8 flex items-center justify-center">
@@ -138,7 +136,6 @@ export default function OverviewPage() {
     );
   }
 
-  // إذا ما في مطعم → setup
   if (!restaurant) {
     return (
       <div className="min-h-screen bg-cream p-8 text-center">
@@ -174,6 +171,13 @@ export default function OverviewPage() {
           </div>
         </div>
       </div>
+
+      {/* ✅ Upgrade / Trial Banner — هون بالـ return */}
+      <UpgradeBanner
+        subscription={subscription}
+        isTrialActive={isTrialActive}
+        trialDaysLeft={trialDaysLeft}
+      />
 
       {/* Stats Grid */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-6">
@@ -290,14 +294,14 @@ export default function OverviewPage() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-ink truncate">
-                    Order #{order.id.slice(0, 6)}
+                    Order #{order.id?.slice(0, 6) ?? '—'}
                   </p>
                   <p className="text-xs text-ink-muted">
                     {new Date(order.created_at).toLocaleString()}
                   </p>
                 </div>
                 <span className="font-bold text-brand text-sm">
-                  ${Number(order.total).toFixed(2)}
+                  ${Number(order.total ?? 0).toFixed(2)}
                 </span>
               </Link>
             ))}

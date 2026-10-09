@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import {
@@ -17,8 +17,6 @@ import {
 import { createClient } from '@/lib/supabase/client';
 import LiveActivity from '@/components/admin/LiveActivity';
 
-const supabase = createClient();
-
 type Stats = {
   totalRestaurants: number;
   activeRestaurants: number;
@@ -26,6 +24,23 @@ type Stats = {
   totalOrders: number;
   totalRevenue: number;
   todayOrders: number;
+};
+
+type RestaurantRow = {
+  id: string;
+  name: string;
+  slug: string;
+  plan: string | null;
+  is_active: boolean;
+  created_at: string;
+  owner_id: string | null;
+};
+
+type OrderRow = {
+  id: string;
+  total: number | string | null;
+  status: string;
+  created_at: string;
 };
 
 export default function AdminOverviewPage() {
@@ -37,12 +52,17 @@ export default function AdminOverviewPage() {
     totalRevenue: 0,
     todayOrders: 0,
   });
-  const [recentRestaurants, setRecentRestaurants] = useState<any[]>([]);
+  const [recentRestaurants, setRecentRestaurants] = useState<RestaurantRow[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let cancelled = false;
+
     const fetchStats = async () => {
       setLoading(true);
+
+      // ✅ createClient داخل useEffect
+      const supabase = createClient();
 
       const today = new Date();
       today.setHours(0, 0, 0, 0);
@@ -54,20 +74,29 @@ export default function AdminOverviewPage() {
         supabase.from('orders').select('id, total, status, created_at'),
       ]);
 
-      const restaurants = restaurantsRes.data ?? [];
-      const orders = ordersRes.data ?? [];
-      const uniqueOwners = new Set(restaurants.map((r) => r.owner_id)).size;
+      if (cancelled) return;
+
+      const restaurants = (restaurantsRes.data ?? []) as RestaurantRow[];
+      const orders = (ordersRes.data ?? []) as OrderRow[];
+      const uniqueOwners = new Set(
+        restaurants.map((r: RestaurantRow) => r.owner_id).filter(Boolean)
+      ).size;
 
       const todayOrders = orders.filter(
-        (o) => new Date(o.created_at) >= today
+        (o: OrderRow) => new Date(o.created_at) >= today
       );
       const revenue = orders
-        .filter((o) => o.status !== 'cancelled')
-        .reduce((s, o) => s + Number(o.total || 0), 0);
+        .filter((o: OrderRow) => o.status !== 'cancelled')
+        .reduce(
+          (s: number, o: OrderRow) => s + Number(o.total || 0),
+          0
+        );
 
       setStats({
         totalRestaurants: restaurants.length,
-        activeRestaurants: restaurants.filter((r) => r.is_active).length,
+        activeRestaurants: restaurants.filter(
+          (r: RestaurantRow) => r.is_active
+        ).length,
         totalUsers: uniqueOwners,
         totalOrders: orders.length,
         totalRevenue: revenue,
@@ -77,7 +106,7 @@ export default function AdminOverviewPage() {
       setRecentRestaurants(
         [...restaurants]
           .sort(
-            (a, b) =>
+            (a: RestaurantRow, b: RestaurantRow) =>
               new Date(b.created_at).getTime() -
               new Date(a.created_at).getTime()
           )
@@ -88,6 +117,10 @@ export default function AdminOverviewPage() {
     };
 
     fetchStats();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   if (loading) {
