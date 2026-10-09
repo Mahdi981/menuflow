@@ -15,6 +15,7 @@ import {
   X,
   PanelLeftClose,
   PanelLeftOpen,
+  Wallet,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 
@@ -23,6 +24,7 @@ const supabase = createClient();
 const NAV = [
   { name: 'Overview', href: '/admin', icon: LayoutGrid },
   { name: 'Restaurants', href: '/admin/restaurants', icon: Store },
+  { name: 'Payments', href: '/admin/payments', icon: Wallet },
   { name: 'Users', href: '/admin/users', icon: Users },
   { name: 'Activity Log', href: '/admin/logs', icon: ScrollText },
   { name: 'Settings', href: '/admin/settings', icon: Settings },
@@ -167,7 +169,6 @@ export default function AdminSidebar({
       >
         <NavContent collapsed={isCollapsed} />
 
-        {/* Collapse Toggle */}
         <button
           onClick={onToggleCollapse}
           className="absolute -right-3 top-20 w-6 h-6 rounded-full bg-amber-custom border-2 border-cream text-white flex items-center justify-center hover:bg-amber-custom-dark transition shadow-lg z-10"
@@ -181,7 +182,7 @@ export default function AdminSidebar({
         </button>
       </aside>
 
-      {/* ============ MOBILE SIDEBAR (Drawer) ============ */}
+      {/* ============ MOBILE SIDEBAR ============ */}
       <AnimatePresence>
         {isMobileOpen && (
           <>

@@ -74,52 +74,22 @@ export default function PricingPage() {
   // ============================================
   // Handle Upgrade (Starter = Free → signup, Pro/Business → checkout)
   // ============================================
-  const handlePlanClick = async (plan: Plan) => {
-    setError(null);
+ const handlePlanClick = async (plan: Plan) => {
+  setError(null);
 
-    // Starter (Free)
-    if (plan.price_usd === 0) {
-      if (user) {
-        router.push('/dashboard');
-      } else {
-        router.push('/auth/signup');
-      }
-      return;
+  // Starter (Free) → dashboard / signup
+  if (plan.price_usd === 0) {
+    if (user) {
+      router.push('/dashboard');
+    } else {
+      router.push('/auth/signup');
     }
+    return;
+  }
 
-    // Pro / Business → يحتاج تسجيل دخول
-    if (!user) {
-      router.push(`/auth/signup?plan=${plan.id}`);
-      return;
-    }
-
-    // ✅ Checkout
-    setCheckoutLoading(plan.id);
-    try {
-      const res = await fetch('/api/dodo/checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ plan: plan.id }),
-      });
-
-      const json = await res.json();
-
-      if (!res.ok) {
-        throw new Error(json.error ?? 'Failed to start checkout');
-      }
-
-      // Redirect to Dodo Checkout
-      if (json.checkout_url) {
-        window.location.href = json.checkout_url;
-      } else {
-        throw new Error('No checkout URL returned');
-      }
-    } catch (err: any) {
-      console.error('Checkout error:', err);
-      setError(err.message);
-      setCheckoutLoading(null);
-    }
-  };
+  // Pro / Business → Whish checkout
+  router.push(`/checkout?plan=${plan.id}`);
+};
 
   if (loading) {
     return (
@@ -263,19 +233,7 @@ export default function PricingPage() {
                       : 'bg-white/5 text-white hover:bg-white/10'
                   }`}
                 >
-                  {isCurrentLoading ? (
-                    <>
-                      <Loader2 size={16} className="animate-spin" />
-                      Redirecting...
-                    </>
-                  ) : (
-                    <>
-                      {plan.price_usd === 0
-                        ? 'Get Started Free'
-                        : `Start ${plan.free_trial_days}-day Trial`}
-                      <ArrowRight size={16} />
-                    </>
-                  )}
+                  {plan.price_usd === 0 ? 'Get Started Free' : `Start ${plan.free_trial_days}-day Trial`}
                 </button>
               </motion.div>
             );
