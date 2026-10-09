@@ -13,6 +13,12 @@ import {
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 
+type RealtimePayload = {
+  new: any;
+  old: any;
+  eventType: 'INSERT' | 'UPDATE' | 'DELETE';
+};
+
 const supabase = createClient();
 
 type Activity = {
@@ -34,8 +40,8 @@ export default function LiveActivity() {
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'orders' },
-        (payload) => {
-          const order = payload.new as any;
+        (payload: RealtimePayload) => {
+  const order = payload.new;
           addActivity({
             id: order.id,
             type: 'order',
@@ -55,7 +61,7 @@ export default function LiveActivity() {
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'restaurants' },
         (payload) => {
-          const r = payload.new as any;
+  const r = payload.new as any;
           addActivity({
             id: r.id,
             type: 'restaurant',
@@ -69,9 +75,9 @@ export default function LiveActivity() {
       .on(
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'restaurants' },
-        (payload) => {
-          const r = payload.new as any;
-          const old = payload.old as any;
+        (payload: RealtimePayload) => {
+  const r = payload.new;
+  const old = payload.old;
           if (old.is_active !== r.is_active) {
             addActivity({
               id: r.id + Date.now(),

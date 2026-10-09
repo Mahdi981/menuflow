@@ -1,5 +1,14 @@
 'use client';
 
+type RestaurantRow = {
+  id: string;
+  name: string;
+  slug: string;
+  plan: string;
+  owner_id: string;
+  created_at: string;
+};
+
 import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import {

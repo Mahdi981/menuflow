@@ -92,7 +92,13 @@ export default function AdminRestaurantDetailPage() {
       setPlan(r.plan);
       setIsActive(r.is_active);
 
-      const orders = ordersRes.data ?? [];
+      const orders = (ordersRes.data ?? []) as Array<{
+  id: string;
+  total: number | string | null;
+  status: string;
+  customer_phone: string | null;
+  created_at: string;
+}>;
       const uniqueCustomers = new Set(
         orders.map((o) => o.customer_phone).filter(Boolean)
       ).size;

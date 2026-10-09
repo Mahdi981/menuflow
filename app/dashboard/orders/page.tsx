@@ -149,7 +149,7 @@ export default function OrdersPage() {
         },
         () => fetchOrders()
       )
-      .subscribe((status) => console.log('📡 Realtime:', status));
+      .subscribe((status: string) => console.log('📡 Realtime:', status));
 
     return () => {
       cancelled = true;
