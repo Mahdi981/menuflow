@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import {
   Wallet,
@@ -17,7 +17,11 @@ import {
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 
-const supabase = createClient();
+const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null);
+if (!supabaseRef.current) {
+  supabaseRef.current = createClient();
+}
+const supabase = supabaseRef.current;
 
 type SubRequest = {
   id: string;

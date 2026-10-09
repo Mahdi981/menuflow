@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { createClient } from '@/lib/supabase/client';
 
 export type PlanLimits = {
@@ -44,7 +44,12 @@ function getFallback(planId: string): PlanLimits {
 }
 
 export function usePlanLimits(planId?: string | null) {
-  const [supabase] = useState(() => createClient());
+
+  const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null);
+if (!supabaseRef.current) {
+  supabaseRef.current = createClient();
+}
+const supabase = supabaseRef.current;;
   const [limits, setLimits] = useState<PlanLimits | null>(null);
   const [loading, setLoading] = useState(true);
 

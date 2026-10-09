@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { createClient } from '@/lib/supabase/client';
 
 export type SubscriptionStatus =
@@ -32,7 +32,11 @@ export type Subscription = {
 };
 
 export function useSubscription(restaurantId?: string | null) {
-  const [supabase] = useState(() => createClient());
+  const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null);
+if (!supabaseRef.current) {
+  supabaseRef.current = createClient();
+}
+const supabase = supabaseRef.current;
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [loading, setLoading] = useState(true);
 
