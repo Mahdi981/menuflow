@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180">
+  <defs>
+    <linearGradient id="brandGradApple" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1C7E84;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#145B60;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <rect width="180" height="180" rx="40" fill="url(#brandGradApple)"/>
+  
+  <!-- Fork -->
+  <g stroke="#FFFFFF" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" fill="none">
+    <path d="M62 45 L62 73"/>
+    <path d="M50 45 L50 67 C50 73 56 79 62 79"/>
+    <path d="M74 45 L74 67 C74 73 68 79 62 79"/>
+    <path d="M62 79 L62 140"/>
+  </g>
+  
+  <!-- Knife -->
+  <g stroke="#FFFFFF" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" fill="none">
+    <path d="M118 45 L118 140"/>
+    <path d="M118 45 C126 51 126 68 118 79 L118 79"/>
+  </g>
+  
+  <!-- Amber dot -->
+  <circle cx="90" cy="118" r="9" fill="#C9A227"/>
+</svg>

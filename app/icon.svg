@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="brandGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1C7E84;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#145B60;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="64" height="64" rx="16" fill="url(#brandGrad)"/>
+  
+  <!-- Fork -->
+  <g stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none">
+    <path d="M22 16 L22 26"/>
+    <path d="M18 16 L18 24 C18 26 20 28 22 28"/>
+    <path d="M26 16 L26 24 C26 26 24 28 22 28"/>
+    <path d="M22 28 L22 50"/>
+  </g>
+  
+  <!-- Knife -->
+  <g stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none">
+    <path d="M42 16 L42 50"/>
+    <path d="M42 16 C45 19 45 24 42 28 L42 28"/>
+  </g>
+  
+  <!-- Amber accent dot -->
+  <circle cx="32" cy="42" r="3" fill="#C9A227"/>
+</svg>
