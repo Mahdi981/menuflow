@@ -58,6 +58,7 @@ const DAY_KEYS: (keyof WorkingHours)[] = [
  * يرجع المفتاح لليوم الحالي
  */
 export function getTodayKey(): keyof WorkingHours {
+  if (typeof window === 'undefined') return 'monday';
   return DAY_KEYS[new Date().getDay()];
 }
 
