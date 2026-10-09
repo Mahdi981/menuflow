@@ -18,5 +18,8 @@ const nextConfig: NextConfig = {
     ],
   },
 };
-
-export default nextConfig;
+  experimental: {
+    // يمنع prerender لصفحات dashboard
+  };
+  
+  export default nextConfig;

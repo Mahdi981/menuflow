@@ -2,6 +2,8 @@
 
 export const dynamic = 'force-dynamic';
 
+// ... باقي الـ imports والكود
+
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
