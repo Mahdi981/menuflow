@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useRestaurant } from '@/lib/hooks/useRestaurant';
+import type { Restaurant } from '@/lib/hooks/useRestaurant';
 import { useSubscription } from '@/lib/hooks/useSubscription';
 import { uploadImage } from '@/lib/utils/uploadImage';
 import { THEME_PRESETS } from '@/lib/themes';
