@@ -8,6 +8,7 @@ import { useCart } from '@/lib/store/cart';
 import { createClient } from '@/lib/supabase/client';
 import { formatCurrency } from '@/lib/utils/formatCurrency';
 import LocationPicker, { type LocationData } from './LocationPicker';
+import { isOpenNow } from '@/lib/types/hours';
 
 const supabase = createClient();
 

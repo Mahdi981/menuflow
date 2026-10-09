@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import type { WorkingHours } from '@/lib/types/hours';
 
 export type Restaurant = {
   id: string;
@@ -22,10 +23,9 @@ export type Restaurant = {
   is_active: boolean;
   accepts_delivery: boolean;
   accepts_pickup: boolean;
-  working_hours: any;
+  working_hours: WorkingHours | null;
   plan: string;
   created_at: string;
-  // ⬇️ جديد
   theme_primary: string | null;
   theme_accent: string | null;
   theme_bg: string | null;
@@ -35,9 +35,7 @@ export type Restaurant = {
 };
 
 export function useRestaurant() {
-  // ✅ الحل: lazy init — بينفّذ مرة وحدة
   const [supabase] = useState(() => createClient());
-
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
   const [subscription, setSubscription] = useState<any>(null);
   const [loading, setLoading] = useState(true);

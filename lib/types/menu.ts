@@ -1,9 +1,8 @@
-// ============================================
-// Restaurant
-// ============================================
+import type { WorkingHours } from './hours';
+
 export type Restaurant = {
-  id: string;              // UUID
-  owner_id: string;        // UUID
+  id: string;
+  owner_id: string;
   name: string;
   name_ar: string | null;
   slug: string;
@@ -20,10 +19,10 @@ export type Restaurant = {
   is_active: boolean;
   accepts_delivery: boolean;
   accepts_pickup: boolean;
-  working_hours: any;
+  working_hours: WorkingHours | null;
   plan: 'starter' | 'professional' | 'business';
   created_at: string;
-   theme_primary: string | null;
+  theme_primary: string | null;
   theme_accent: string | null;
   theme_bg: string | null;
   theme_text: string | null;
@@ -31,12 +30,9 @@ export type Restaurant = {
   favicon_url: string | null;
 };
 
-// ============================================
-// Category
-// ============================================
 export type Category = {
-  id: string;              // UUID
-  restaurant_id: string;   // UUID
+  id: string;
+  restaurant_id: string;
   name: string;
   name_ar: string | null;
   icon: string | null;
@@ -44,9 +40,6 @@ export type Category = {
   created_at?: string;
 };
 
-// ============================================
-// Product
-// ============================================
 export type ProductAddon = {
   id: string;
   product_id: string;
@@ -69,9 +62,9 @@ export type ProductVariant = {
 };
 
 export type Product = {
-  id: string;              // UUID
-  restaurant_id: string;   // UUID
-  category_id: string | null; // UUID
+  id: string;
+  restaurant_id: string;
+  category_id: string | null;
   name: string;
   description: string | null;
   price: number;
@@ -81,35 +74,25 @@ export type Product = {
   featured: boolean;
   sort_order: number;
   created_at?: string;
-  // جديد
   addons?: ProductAddon[];
   variants?: ProductVariant[];
 };
 
-// ============================================
-// Cart
-// ============================================
 export type CartItem = {
-  cart_item_id: string;   // unique per combination
+  cart_item_id: string;
   product_id: string;
   name: string;
   base_price: number;
-  price: number;           // effective price
+  price: number;
   original_price: number;
   qty: number;
   image_url: string | null;
-  // variant
   variant_id?: string | null;
   variant_name?: string | null;
-  // addons
   addons?: { id: string; name: string; price: number }[];
-  // notes
   notes?: string | null;
 };
 
-// ============================================
-// Order
-// ============================================
 export type OrderType = 'delivery' | 'pickup';
 
 export type OrderStatus =
@@ -121,17 +104,11 @@ export type OrderStatus =
   | 'completed'
   | 'cancelled';
 
-// ============================================
-// Menu (Full data)
-// ============================================
 export type FullMenu = Restaurant & {
   categories: (Category & { products: Product[] })[];
   uncategorized: Product[];
 };
 
-// ============================================
-// Helpers
-// ============================================
 export function effectivePrice(p: Product): number {
   return p.discount_price ?? p.price;
 }

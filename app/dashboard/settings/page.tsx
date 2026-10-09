@@ -18,6 +18,13 @@ import { createClient } from '@/lib/supabase/client';
 import { useRestaurant } from '@/lib/hooks/useRestaurant';
 import { uploadImage } from '@/lib/utils/uploadImage';
 import { THEME_PRESETS } from '@/lib/themes';
+import { Clock } from 'lucide-react';
+import {
+  DEFAULT_HOURS,
+  DAY_LABELS,
+  DAY_LABELS_AR,
+  type WorkingHours,
+} from '@/lib/types/hours';
 
 const supabase = createClient();
 
@@ -52,6 +59,7 @@ type FormState = {
   theme_bg: string;
   theme_text: string;
   theme_preset: string;
+  working_hours: WorkingHours;
 };
 
  export default function SettingsPage() {
@@ -67,6 +75,7 @@ type FormState = {
   useEffect(() => {
     if (!restaurant) return;
     setForm({
+      
       name: restaurant.name ?? '',
       name_ar: restaurant.name_ar ?? '',
       description: restaurant.description ?? '',
@@ -88,6 +97,7 @@ type FormState = {
       theme_bg: restaurant.theme_bg ?? '#F0EEE9',
       theme_text: restaurant.theme_text ?? '#1A1A1A',
       theme_preset: restaurant.theme_preset ?? 'teal',
+      working_hours: restaurant.working_hours ?? DEFAULT_HOURS,
     });
   }, [restaurant]);
 
@@ -185,6 +195,7 @@ type FormState = {
         theme_bg: form.theme_bg,
         theme_text: form.theme_text,
         theme_preset: form.theme_preset,
+        working_hours: form.working_hours,
       })
       .eq('id', restaurant.id);
 
@@ -527,6 +538,117 @@ type FormState = {
               />
             </div>
           </Section>
+
+          {/* Working Hours */}
+<Section icon={<Clock size={18} />} title="Working Hours">
+  <div className="space-y-2">
+    {(Object.keys(DAY_LABELS) as (keyof WorkingHours)[]).map((day) => {
+      const dayHours = form.working_hours[day];
+      return (
+        <div
+          key={day}
+          className="flex flex-col sm:flex-row sm:items-center gap-3 p-3 rounded-xl bg-cream"
+        >
+          <div className="flex items-center gap-2 sm:w-32 shrink-0">
+            <button
+              type="button"
+              onClick={() => {
+                const newHours = { ...form.working_hours };
+                newHours[day] = { ...dayHours, closed: !dayHours.closed };
+                update('working_hours', newHours);
+              }}
+              className={`relative w-10 h-6 rounded-full transition shrink-0 ${
+                dayHours.closed ? 'bg-gray-300' : 'bg-green-500'
+              }`}
+              title={dayHours.closed ? 'مغلق' : 'مفتوح'}
+            >
+              <span
+                className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all ${
+                  dayHours.closed ? 'left-0.5' : 'left-[18px]'
+                }`}
+              />
+            </button>
+            <div>
+              <p className="text-sm font-semibold text-ink">
+                {DAY_LABELS[day]}
+              </p>
+              <p className="text-[10px] text-ink-muted">
+                {DAY_LABELS_AR[day]}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex-1 flex items-center gap-2">
+            {dayHours.closed ? (
+              <p className="text-sm text-ink-muted italic px-2">مغلق</p>
+            ) : (
+              <>
+                <input
+                  type="time"
+                  value={dayHours.open}
+                  onChange={(e) => {
+                    const newHours = { ...form.working_hours };
+                    newHours[day] = { ...dayHours, open: e.target.value };
+                    update('working_hours', newHours);
+                  }}
+                  className="flex-1 bg-white border border-line rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:border-brand font-mono"
+                />
+                <span className="text-ink-muted text-sm shrink-0">—</span>
+                <input
+                  type="time"
+                  value={dayHours.close}
+                  onChange={(e) => {
+                    const newHours = { ...form.working_hours };
+                    newHours[day] = { ...dayHours, close: e.target.value };
+                    update('working_hours', newHours);
+                  }}
+                  className="flex-1 bg-white border border-line rounded-lg px-3 py-2 text-sm text-ink focus:outline-none focus:border-brand font-mono"
+                />
+              </>
+            )}
+          </div>
+        </div>
+      );
+    })}
+  </div>
+
+  <div className="flex gap-2 pt-2">
+    <button
+      type="button"
+      onClick={() => {
+        const newHours = { ...DEFAULT_HOURS };
+        Object.keys(newHours).forEach((k) => {
+          newHours[k as keyof WorkingHours] = {
+            open: '09:00',
+            close: '23:00',
+            closed: false,
+          };
+        });
+        update('working_hours', newHours);
+      }}
+      className="flex-1 px-3 py-2 rounded-lg bg-cream hover:bg-brand/10 text-xs font-semibold text-ink transition"
+    >
+      فتح كل الأيام
+    </button>
+    <button
+      type="button"
+      onClick={() => {
+        const newHours = { ...DEFAULT_HOURS };
+        Object.keys(newHours).forEach((k) => {
+          newHours[k as keyof WorkingHours] = {
+            open: '09:00',
+            close: '23:00',
+            closed: true,
+          };
+        });
+        update('working_hours', newHours);
+      }}
+      className="flex-1 px-3 py-2 rounded-lg bg-cream hover:bg-red-500/10 text-xs font-semibold text-ink transition"
+    >
+      إغلاق كل الأيام
+    </button>
+  </div>
+</Section>
 
           {/* Currency */}
           <Section icon={<DollarSign size={18} />} title="Currency">

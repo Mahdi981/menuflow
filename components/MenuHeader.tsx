@@ -1,6 +1,10 @@
 import type { Restaurant } from '@/lib/types/menu';
+import { getStatusText, getTodayHoursText } from '@/lib/types/hours';
 
 export default function MenuHeader({ restaurant }: { restaurant: Restaurant }) {
+  const status = getStatusText(restaurant.working_hours);
+  const todayHours = getTodayHoursText(restaurant.working_hours);
+
   return (
     <header className="relative">
       {/* Cover */}
@@ -19,7 +23,6 @@ export default function MenuHeader({ restaurant }: { restaurant: Restaurant }) {
           />
         )}
 
-        {/* Dark gradient overlay */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent" />
       </div>
 
@@ -61,18 +64,50 @@ export default function MenuHeader({ restaurant }: { restaurant: Restaurant }) {
               <p
                 className="text-sm mt-1 line-clamp-2"
                 style={{
-                  color: 'color-mix(in srgb, var(--color-ink) 60%, transparent)',
+                  color:
+                    'color-mix(in srgb, var(--color-ink) 60%, transparent)',
                 }}
               >
                 {restaurant.description}
               </p>
             )}
 
-            {/* Meta */}
+            {/* Status + Hours */}
+            <div className="flex flex-wrap items-center gap-2 mt-3">
+              <div
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border ${
+                  status.isOpen
+                    ? 'bg-green-500/10 text-green-600 border-green-500/30'
+                    : 'bg-red-500/10 text-red-600 border-red-500/30'
+                }`}
+              >
+                <span
+                  className={`w-1.5 h-1.5 rounded-full ${
+                    status.isOpen ? 'bg-green-500' : 'bg-red-500'
+                  }`}
+                />
+                {status.labelAr}
+              </div>
+
+              {todayHours && (
+                <span
+                  className="text-xs flex items-center gap-1"
+                  style={{
+                    color:
+                      'color-mix(in srgb, var(--color-ink) 60%, transparent)',
+                  }}
+                >
+                  🕐 {todayHours}
+                </span>
+              )}
+            </div>
+
+            {/* Meta: City + Phone */}
             <div
               className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mt-3 text-xs"
               style={{
-                color: 'color-mix(in srgb, var(--color-ink) 60%, transparent)',
+                color:
+                  'color-mix(in srgb, var(--color-ink) 60%, transparent)',
               }}
             >
               {restaurant.city && (
