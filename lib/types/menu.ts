@@ -19,7 +19,7 @@ export type Restaurant = {
   is_active: boolean;
   accepts_delivery: boolean;
   accepts_pickup: boolean;
-  working_hours: WorkingHours | null;
+  working_hours: any;
   plan: 'starter' | 'professional' | 'business';
   created_at: string;
   theme_primary: string | null;

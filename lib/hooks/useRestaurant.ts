@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import type { WorkingHours } from '@/lib/types/hours';
 
 export type Restaurant = {
   id: string;
@@ -23,7 +22,7 @@ export type Restaurant = {
   is_active: boolean;
   accepts_delivery: boolean;
   accepts_pickup: boolean;
-  working_hours: WorkingHours | null;
+  working_hours: any;
   plan: string;
   created_at: string;
   theme_primary: string | null;
@@ -46,8 +45,6 @@ export function useRestaurant() {
     const fetchData = async () => {
       try {
         setLoading(true);
-
-        // ✅ ننشئ الـ client هنا — داخل useEffect فقط
         const supabase = createClient();
 
         const {
