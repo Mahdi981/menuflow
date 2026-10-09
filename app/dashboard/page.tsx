@@ -20,6 +20,9 @@ import {
   formatLimit,
 } from '@/lib/hooks/usePlanLimits';
 
+import { useSubscription } from '@/lib/hooks/useSubscription';
+import UpgradeBanner from '@/components/UpgradeBanner';
+
 const supabase = createClient();
 
 type Stats = {
@@ -35,6 +38,18 @@ type Stats = {
 export default function OverviewPage() {
   const { restaurant, loading: restaurantLoading } = useRestaurant();
   const { limits } = usePlanLimits(restaurant?.plan);
+  const {
+  subscription,
+  isTrialActive,
+  trialDaysLeft,
+} = useSubscription(restaurant?.id);
+
+{/* Upgrade / Trial Banner */}
+<UpgradeBanner
+  subscription={subscription}
+  isTrialActive={isTrialActive}
+  trialDaysLeft={trialDaysLeft}
+/>
 
   const [stats, setStats] = useState<Stats>({
     todayOrders: 0,

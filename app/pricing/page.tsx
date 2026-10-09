@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import {
   Check,
@@ -36,11 +37,16 @@ const PLAN_COLORS: Record<PlanId, 'gray' | 'orange' | 'blue'> = {
 };
 
 export default function PricingPage() {
+  const router = useRouter();
   const [plans, setPlans] = useState<Plan[]>([]);
   const [loading, setLoading] = useState(true);
+  const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
+  const [user, setUser] = useState<any>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const fetchPlans = async () => {
+    const init = async () => {
+      // 1. خطط
       const { data, error } = await supabase
         .from('plans')
         .select('*')
@@ -48,16 +54,72 @@ export default function PricingPage() {
         .order('sort_order', { ascending: true });
 
       if (error || !data || data.length === 0) {
-        // Fallback
         setPlans(Object.values(DEFAULT_PLANS));
       } else {
         setPlans(data as Plan[]);
       }
+
+      // 2. المستخدم
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      setUser(user);
+
       setLoading(false);
     };
 
-    fetchPlans();
+    init();
   }, []);
+
+  // ============================================
+  // Handle Upgrade (Starter = Free → signup, Pro/Business → checkout)
+  // ============================================
+  const handlePlanClick = async (plan: Plan) => {
+    setError(null);
+
+    // Starter (Free)
+    if (plan.price_usd === 0) {
+      if (user) {
+        router.push('/dashboard');
+      } else {
+        router.push('/auth/signup');
+      }
+      return;
+    }
+
+    // Pro / Business → يحتاج تسجيل دخول
+    if (!user) {
+      router.push(`/auth/signup?plan=${plan.id}`);
+      return;
+    }
+
+    // ✅ Checkout
+    setCheckoutLoading(plan.id);
+    try {
+      const res = await fetch('/api/dodo/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan: plan.id }),
+      });
+
+      const json = await res.json();
+
+      if (!res.ok) {
+        throw new Error(json.error ?? 'Failed to start checkout');
+      }
+
+      // Redirect to Dodo Checkout
+      if (json.checkout_url) {
+        window.location.href = json.checkout_url;
+      } else {
+        throw new Error('No checkout URL returned');
+      }
+    } catch (err: any) {
+      console.error('Checkout error:', err);
+      setError(err.message);
+      setCheckoutLoading(null);
+    }
+  };
 
   if (loading) {
     return (
@@ -85,10 +147,19 @@ export default function PricingPage() {
             with your restaurant
           </h1>
           <p className="text-gray-400 max-w-xl mx-auto">
-            Start with a 14-day free trial. Cancel anytime.
+            Start free with Starter. Upgrade anytime. Cancel anytime.
           </p>
         </motion.div>
       </div>
+
+      {/* Error */}
+      {error && (
+        <div className="max-w-3xl mx-auto mb-6 px-4">
+          <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
+            {error}
+          </div>
+        </div>
+      )}
 
       {/* Plans */}
       <div className="max-w-6xl mx-auto px-4 pb-20">
@@ -97,6 +168,7 @@ export default function PricingPage() {
             const Icon = PLAN_ICONS[plan.id] ?? Sparkles;
             const isPopular = plan.id === 'professional';
             const color = PLAN_COLORS[plan.id] ?? 'gray';
+            const isCurrentLoading = checkoutLoading === plan.id;
 
             return (
               <motion.div
@@ -143,7 +215,9 @@ export default function PricingPage() {
                     <span className="text-4xl font-bold">
                       ${plan.price_usd}
                     </span>
-                    <span className="text-sm text-gray-500">/ month</span>
+                    <span className="text-sm text-gray-500">
+                      {plan.price_usd === 0 ? '/ forever free' : '/ month'}
+                    </span>
                   </div>
 
                   {plan.free_trial_days > 0 && (
@@ -156,7 +230,6 @@ export default function PricingPage() {
 
                 {/* Features */}
                 <ul className="space-y-3 mb-8">
-                  {/* Auto-generated from plan limits */}
                   <FeatureItem
                     label={`${formatLimit(plan.max_categories)} Categor${
                       plan.max_categories === 1 ? 'y' : 'ies'
@@ -171,7 +244,6 @@ export default function PricingPage() {
                     label={`${formatLimit(plan.max_orders_per_month)} Orders / month`}
                   />
 
-                  {/* Custom features */}
                   {plan.features?.map((f) => (
                     <FeatureItem
                       key={f.label}
@@ -182,30 +254,39 @@ export default function PricingPage() {
                 </ul>
 
                 {/* CTA */}
-                <Link
-                  href={`/auth/signup?plan=${plan.id}`}
-                  className={`flex items-center justify-center gap-2 w-full py-3.5 rounded-xl font-semibold transition ${
+                <button
+                  onClick={() => handlePlanClick(plan)}
+                  disabled={isCurrentLoading}
+                  className={`w-full flex items-center justify-center gap-2 py-3.5 rounded-xl font-semibold transition disabled:opacity-60 ${
                     isPopular
                       ? 'bg-gradient-to-r from-brand to-brand-dark text-white hover:opacity-90 shadow-brand'
                       : 'bg-white/5 text-white hover:bg-white/10'
                   }`}
                 >
-                  Start {plan.free_trial_days}-day Trial
-                  <ArrowRight size={16} />
-                </Link>
+                  {isCurrentLoading ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" />
+                      Redirecting...
+                    </>
+                  ) : (
+                    <>
+                      {plan.price_usd === 0
+                        ? 'Get Started Free'
+                        : `Start ${plan.free_trial_days}-day Trial`}
+                      <ArrowRight size={16} />
+                    </>
+                  )}
+                </button>
               </motion.div>
             );
           })}
         </div>
 
-        {/* Footer note */}
+        {/* Footer */}
         <div className="text-center mt-12 text-sm text-gray-500">
           <p>
             Need something custom?{' '}
-            <a
-              href="mailto:hello@meinfina.com"
-              className="text-brand underline"
-            >
+            <a href="mailto:support@menu-restaurant.store" className="text-brand underline">
               Contact us
             </a>
           </p>

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { motion } from 'framer-motion';
 import {
   Save,
@@ -13,12 +14,17 @@ import {
   Link as LinkIcon,
   Check,
   Palette,
+  Clock,
+  CreditCard,
+  ExternalLink,
+  Crown,
+  ArrowRight,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useRestaurant } from '@/lib/hooks/useRestaurant';
+import { useSubscription } from '@/lib/hooks/useSubscription';
 import { uploadImage } from '@/lib/utils/uploadImage';
 import { THEME_PRESETS } from '@/lib/themes';
-import { Clock } from 'lucide-react';
 import {
   DEFAULT_HOURS,
   DAY_LABELS,
@@ -26,7 +32,13 @@ import {
   type WorkingHours,
 } from '@/lib/types/hours';
 
+
 const supabase = createClient();
+const { restaurant, loading: restaurantLoading, refresh } = useRestaurant();
+
+const { subscription, isTrialActive, trialDaysLeft } = useSubscription(
+  restaurant?.id
+);
 
 const CURRENCIES = [
   { code: 'USD', label: 'USD — US Dollar ($)' },
@@ -763,6 +775,97 @@ type FormState = {
               </p>
             </div>
           </Section>
+          <Section icon={<CreditCard size={18} />} title="Subscription">
+  {!subscription ? (
+    <div className="text-center py-6">
+      <div className="w-12 h-12 rounded-xl bg-cream mx-auto flex items-center justify-center mb-3">
+        <Crown size={20} className="text-brand" />
+      </div>
+      <p className="text-sm text-ink-muted mb-3">
+        You're on the Free Starter plan
+      </p>
+      <Link
+        href="/pricing"
+        className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-brand hover:bg-brand-dark text-white text-sm font-semibold shadow-brand transition"
+      >
+        Upgrade Plan
+        <ArrowRight size={14} />
+      </Link>
+    </div>
+  ) : (
+    <div className="space-y-3">
+      {/* Plan */}
+      <div className="flex items-center justify-between p-3 rounded-xl bg-cream">
+        <div>
+          <p className="text-xs text-ink-muted uppercase tracking-wider">
+            Current Plan
+          </p>
+          <p className="font-bold text-brand uppercase">
+            {subscription.plan}
+          </p>
+        </div>
+        <span
+          className={`text-xs font-bold px-2.5 py-1 rounded-full border ${
+            subscription.status === 'active'
+              ? 'bg-green-500/10 text-green-600 border-green-500/30'
+              : subscription.status === 'trial'
+                ? 'bg-amber-custom/10 text-amber-custom border-amber-custom/30'
+                : 'bg-red-500/10 text-red-600 border-red-500/30'
+          }`}
+        >
+          {subscription.status === 'active'
+            ? 'Active'
+            : subscription.status === 'trial'
+              ? `Trial — ${trialDaysLeft}d left`
+              : subscription.status}
+        </span>
+      </div>
+
+      {/* Price */}
+      <div className="flex items-center justify-between p-3 rounded-xl bg-cream">
+        <div>
+          <p className="text-xs text-ink-muted uppercase tracking-wider">
+            Price
+          </p>
+          <p className="font-bold text-ink">
+            ${subscription.price_usd} / month
+          </p>
+        </div>
+      </div>
+
+      {/* Period end */}
+      {subscription.current_period_end && (
+        <div className="flex items-center justify-between p-3 rounded-xl bg-cream">
+          <div>
+            <p className="text-xs text-ink-muted uppercase tracking-wider">
+              {subscription.status === 'active' ? 'Renews' : 'Ends'}
+            </p>
+            <p className="font-bold text-ink">
+              {new Date(subscription.current_period_end).toLocaleDateString()}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Manage */}
+      <a
+        href="https://app.dodopayments.com/"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-brand/5 hover:bg-brand/10 border border-brand/20 text-brand font-semibold text-sm transition"
+      >
+        Manage Subscription
+        <ExternalLink size={14} />
+      </a>
+
+      {subscription.status === 'active' && (
+        <p className="text-xs text-ink-muted text-center">
+          لإلغاء الاشتراك، استخدم زر "Manage Subscription" أعلاه
+        </p>
+      )}
+    </div>
+  )}
+</Section>
 
           {/* Public URL */}
           <Section icon={<LinkIcon size={18} />} title="Public URL">
