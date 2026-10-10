@@ -17,12 +17,6 @@ import {
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 
-const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null);
-if (!supabaseRef.current) {
-  supabaseRef.current = createClient();
-}
-const supabase = supabaseRef.current;
-
 type SubRequest = {
   id: string;
   reference_number: string;
@@ -46,6 +40,13 @@ type SubRequest = {
 type Filter = 'all' | 'pending' | 'paid' | 'activated' | 'cancelled';
 
 export default function AdminPaymentsPage() {
+  // ✅ createClient داخل المكون — lazy init
+  const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null);
+  if (!supabaseRef.current) {
+    supabaseRef.current = createClient();
+  }
+  const supabase = supabaseRef.current;
+
   const [requests, setRequests] = useState<SubRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -67,7 +68,6 @@ export default function AdminPaymentsPage() {
   useEffect(() => {
     fetchRequests();
 
-    // Realtime
     const channel = supabase
       .channel('admin-sub-requests')
       .on(
@@ -124,14 +124,12 @@ export default function AdminPaymentsPage() {
       .update(updates)
       .eq('id', id);
 
-    // إذا activated → فعّل المطعم
     if (!error && status === 'activated' && request.restaurant_id) {
       await supabase
         .from('restaurants')
         .update({ plan: request.plan })
         .eq('id', request.restaurant_id);
 
-      // أنشئ سجل في subscriptions
       await supabase.from('subscriptions').upsert(
         {
           restaurant_id: request.restaurant_id,
@@ -330,7 +328,9 @@ export default function AdminPaymentsPage() {
                     <p className="text-sm text-ink flex items-center gap-2">
                       <span className="truncate">{req.phone}</span>
                       <button
-                        onClick={() => copyToClipboard(req.phone, `phone-${req.id}`)}
+                        onClick={() =>
+                          copyToClipboard(req.phone, `phone-${req.id}`)
+                        }
                         className="p-1 hover:bg-brand/10 rounded transition"
                       >
                         {copied === `phone-${req.id}` ? (
@@ -375,9 +375,7 @@ export default function AdminPaymentsPage() {
                       </motion.button>
 
                       <button
-                        onClick={() =>
-                          updateStatus(req.id, 'cancelled', req)
-                        }
+                        onClick={() => updateStatus(req.id, 'cancelled', req)}
                         disabled={isUpdating}
                         className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-600 text-sm font-semibold hover:bg-red-500/20 transition disabled:opacity-60"
                       >
@@ -387,7 +385,11 @@ export default function AdminPaymentsPage() {
 
                       <button
                         onClick={() =>
-                          openWhatsApp(req.phone, req.owner_name, req.reference_number)
+                          openWhatsApp(
+                            req.phone,
+                            req.owner_name,
+                            req.reference_number
+                          )
                         }
                         className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#25D366] hover:bg-[#20BD5A] text-white text-sm font-semibold transition"
                       >
@@ -415,7 +417,11 @@ export default function AdminPaymentsPage() {
 
                       <button
                         onClick={() =>
-                          openWhatsApp(req.phone, req.owner_name, req.reference_number)
+                          openWhatsApp(
+                            req.phone,
+                            req.owner_name,
+                            req.reference_number
+                          )
                         }
                         className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#25D366] hover:bg-[#20BD5A] text-white text-sm font-semibold transition"
                       >
