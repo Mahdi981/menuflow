@@ -18,9 +18,10 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import PageSkeleton from '@/components/dashboard/PageSkeleton';
 import { useRestaurant } from '@/lib/hooks/useRestaurant';
+import { formatCurrency } from '@/lib/utils/formatCurrency';
 import { useOrderNotifications } from '@/lib/hooks/useOrderNotifications';
-import NotificationButton from '@/components/NotificationButton';
 
 const supabase = createClient();
 
@@ -206,9 +207,7 @@ export default function OrdersPage() {
 
   if (restaurantLoading || loading) {
     return (
-      <div className="min-h-screen bg-cream p-8 flex items-center justify-center">
-        <div className="w-8 h-8 rounded-full border-2 border-brand border-t-transparent animate-spin" />
-      </div>
+      <PageSkeleton />
     );
   }
 
@@ -231,7 +230,6 @@ export default function OrdersPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <NotificationButton />
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-green-500/10 border border-green-500/20">
             <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
             <span className="text-xs font-medium text-green-600">Live</span>
@@ -336,7 +334,7 @@ export default function OrdersPage() {
                       {order.type === 'delivery' ? 'Delivery' : 'Pickup'}
                     </span>
                     <span className="text-lg font-bold text-brand">
-                      ${order.total.toFixed(2)}
+                      {formatCurrency(order.total, restaurant.currency)}
                     </span>
                   </div>
                 </div>
@@ -423,12 +421,12 @@ export default function OrdersPage() {
                 {/* Footer */}
                 <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-line">
                   <div className="flex items-center gap-3 text-xs text-ink-muted">
-                    <span>Subtotal: ${order.subtotal.toFixed(2)}</span>
+                    <span>Subtotal: {formatCurrency(order.subtotal, restaurant.currency)}</span>
                     {order.delivery_fee > 0 && (
                       <span>Delivery: ${order.delivery_fee.toFixed(2)}</span>
                     )}
                     <span className="font-bold text-ink">
-                      Total: ${order.total.toFixed(2)}
+                      Total: {formatCurrency(order.total, restaurant.currency)}
                     </span>
                   </div>
 

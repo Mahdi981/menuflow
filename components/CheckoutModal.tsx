@@ -7,6 +7,7 @@ import type { Restaurant, OrderType } from '@/lib/types/menu';
 import { useCart } from '@/lib/store/cart';
 import { createClient } from '@/lib/supabase/client';
 import { formatCurrency } from '@/lib/utils/formatCurrency';
+import { useModalBehavior } from '@/lib/hooks/useModalBehavior';
 import LocationPicker, { type LocationData } from './LocationPicker';
 import { isOpenNow } from '@/lib/types/hours';
 
@@ -374,6 +375,8 @@ export default function CheckoutModal({
     onSuccess();
   };
 
+  useModalBehavior(open, orderResult ? handleDone : handleClose);
+
   return (
     <AnimatePresence>
       {open && (
@@ -383,14 +386,17 @@ export default function CheckoutModal({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={handleClose}
-            className="fixed inset-0 bg-black/50 z-[60]"
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60]"
           />
           <motion.div
             initial={{ y: '100%' }}
             animate={{ y: 0 }}
             exit={{ y: '100%' }}
             transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-            className="fixed bottom-0 left-0 right-0 z-[60] bg-surface rounded-t-3xl max-h-[90vh] overflow-y-auto max-w-3xl mx-auto shadow-2xl"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Checkout"
+            className="fixed bottom-0 left-0 right-0 z-[60] bg-surface rounded-t-3xl max-h-[90dvh] overflow-y-auto overscroll-contain max-w-3xl mx-auto shadow-2xl pb-safe"
           >
             {orderResult ? (
               /* ========== SUCCESS ========== */
@@ -471,7 +477,8 @@ export default function CheckoutModal({
                   <h2 className="text-lg font-bold text-ink">Checkout</h2>
                   <button
                     onClick={handleClose}
-                    className="p-2 hover:bg-cream rounded-full text-ink-muted"
+                    className="p-2.5 -m-1 hover:bg-cream rounded-full text-ink-muted transition-colors"
+                    aria-label="Close checkout"
                   >
                     <X size={20} />
                   </button>
@@ -517,7 +524,7 @@ export default function CheckoutModal({
                       required
                       value={name}
                       onChange={(e) => setName(e.target.value)}
-                      className="w-full bg-white border border-line rounded-xl px-4 py-3 text-ink placeholder:text-ink-muted/50 focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
+                      className="w-full bg-surface border border-line rounded-xl px-4 py-3 text-ink placeholder:text-ink-muted/50 focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
                       placeholder="Your name"
                     />
                   </div>
@@ -545,7 +552,7 @@ export default function CheckoutModal({
                         }}
                         placeholder="70 123 456"
                         maxLength={8}
-                        className="flex-1 bg-white border border-line rounded-xl px-4 py-3 text-ink placeholder:text-ink-muted/50 focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 font-mono tracking-wider"
+                        className="flex-1 bg-surface border border-line rounded-xl px-4 py-3 text-ink placeholder:text-ink-muted/50 focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 font-mono tracking-wider"
                       />
                     </div>
                     <p className="text-xs text-ink-muted mt-1 flex items-center gap-1">
@@ -573,7 +580,7 @@ export default function CheckoutModal({
                       value={notes}
                       onChange={(e) => setNotes(e.target.value)}
                       rows={2}
-                      className="w-full bg-white border border-line rounded-xl px-4 py-3 text-ink placeholder:text-ink-muted/50 focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 resize-none"
+                      className="w-full bg-surface border border-line rounded-xl px-4 py-3 text-ink placeholder:text-ink-muted/50 focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 resize-none"
                       placeholder="Any special requests..."
                     />
                   </div>
@@ -619,7 +626,7 @@ export default function CheckoutModal({
                               setCouponCode(e.target.value.toUpperCase())
                             }
                             placeholder="Enter code"
-                            className="w-full bg-white border border-line rounded-xl pl-10 pr-3 py-3 font-mono text-ink placeholder:text-ink-muted/50 focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
+                            className="w-full bg-surface border border-line rounded-xl pl-10 pr-3 py-3 font-mono text-ink placeholder:text-ink-muted/50 focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
                           />
                         </div>
                         <button

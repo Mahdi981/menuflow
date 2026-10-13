@@ -7,6 +7,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { useRestaurant } from '@/lib/hooks/useRestaurant';
+import PageSkeleton from '@/components/dashboard/PageSkeleton';
 import {
   usePlanLimits,
   formatLimit,
@@ -189,9 +190,7 @@ export default function CategoriesPage() {
 
   if (restLoading || loading) {
     return (
-      <div className="min-h-screen bg-cream flex items-center justify-center">
-        <div className="w-10 h-10 border-4 border-brand/30 border-t-brand rounded-full animate-spin" />
-      </div>
+      <PageSkeleton />
     );
   }
 

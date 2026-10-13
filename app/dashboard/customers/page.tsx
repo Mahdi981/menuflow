@@ -8,12 +8,13 @@ import {
   Phone,
   DollarSign,
   TrendingUp,
-  Loader2,
   Crown,
   MapPin,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import PageSkeleton from '@/components/dashboard/PageSkeleton';
 import { useRestaurant } from '@/lib/hooks/useRestaurant';
+import { formatCurrency } from '@/lib/utils/formatCurrency';
 
 const supabase = createClient();
 
@@ -137,9 +138,7 @@ export default function CustomersPage() {
 
   if (restaurantLoading || loading) {
     return (
-      <div className="min-h-screen bg-cream flex items-center justify-center">
-        <Loader2 size={32} className="animate-spin text-brand" />
-      </div>
+      <PageSkeleton />
     );
   }
 
@@ -178,13 +177,13 @@ export default function CustomersPage() {
         <StatCard
           icon={<DollarSign size={18} />}
           label="Revenue"
-          value={`$${stats.revenue.toFixed(0)}`}
+          value={formatCurrency(stats.revenue, restaurant.currency)}
           color="green"
         />
         <StatCard
           icon={<TrendingUp size={18} />}
           label="Avg / Customer"
-          value={`$${stats.avg.toFixed(2)}`}
+          value={formatCurrency(stats.avg, restaurant.currency)}
           color="brand"
         />
       </div>
@@ -287,7 +286,7 @@ export default function CustomersPage() {
                     Spent
                   </p>
                   <p className="font-bold text-sm text-brand">
-                    ${customer.totalSpent.toFixed(2)}
+                    {formatCurrency(customer.totalSpent, restaurant.currency)}
                   </p>
                 </div>
               </div>

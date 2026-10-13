@@ -3,6 +3,7 @@
 export const dynamic = 'force-dynamic';
 
 import { useState, useEffect } from 'react';
+import { MotionConfig } from 'framer-motion';
 import Sidebar from '@/components/dashboard/Sidebar';
 import TopBar from '@/components/dashboard/TopBar';
 
@@ -39,23 +40,24 @@ export default function DashboardLayout({
   }, [isMobileOpen]);
 
   return (
-    <div className="flex min-h-screen bg-cream">
-      {/* Sidebar */}
-      <Sidebar
-        isMobileOpen={isMobileOpen}
-        onMobileClose={() => setIsMobileOpen(false)}
-        isCollapsed={isCollapsed}
-        onToggleCollapse={() => setIsCollapsed((c) => !c)}
-      />
+    <MotionConfig reducedMotion="user">
+      <div className="flex min-h-screen bg-cream">
+        {/* Sidebar */}
+        <Sidebar
+          isMobileOpen={isMobileOpen}
+          onMobileClose={() => setIsMobileOpen(false)}
+          isCollapsed={isCollapsed}
+          onToggleCollapse={() => setIsCollapsed((c) => !c)}
+        />
 
-      {/* Main */}
-      <div className="flex-1 min-w-0 flex flex-col">
-        {/* TopBar (mobile only) */}
-        <TopBar onMenuClick={() => setIsMobileOpen(true)} />
+        {/* Main */}
+        <div className="flex-1 min-w-0 flex flex-col">
+          <TopBar onMenuClick={() => setIsMobileOpen(true)} />
 
-        {/* Content */}
-        <main className="flex-1 min-w-0 bg-cream">{children}</main>
+          {/* Content */}
+          <main className="flex-1 min-w-0 bg-cream">{children}</main>
+        </div>
       </div>
-    </div>
+    </MotionConfig>
   );
 }

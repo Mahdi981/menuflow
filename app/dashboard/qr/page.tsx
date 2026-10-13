@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import QRCode from 'react-qr-code';
 import { useRestaurant } from '@/lib/hooks/useRestaurant';
+import PageSkeleton from '@/components/dashboard/PageSkeleton';
 
 export default function QRPage() {
   const { restaurant, loading } = useRestaurant();
@@ -20,9 +21,7 @@ export default function QRPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-cream flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-brand border-t-transparent rounded-full animate-spin" />
-      </div>
+      <PageSkeleton />
     );
   }
 

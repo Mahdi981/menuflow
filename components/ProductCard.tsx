@@ -1,7 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { Plus } from 'lucide-react';
+import { Plus, SlidersHorizontal, Star } from 'lucide-react';
 import type { Product } from '@/lib/types/menu';
 import { formatCurrency } from '@/lib/utils/formatCurrency';
 
@@ -10,11 +10,13 @@ export default function ProductCard({
   currency,
   onAdd,
   onOpenDetail,
+  index = 0,
 }: {
   product: Product;
   currency: string;
   onAdd: () => void;
   onOpenDetail?: () => void;
+  index?: number;
 }) {
   const hasDiscount =
     product.discount_price !== null && product.discount_price < product.price;
@@ -28,21 +30,40 @@ export default function ProductCard({
     (product.variants && product.variants.length > 0) ||
     (product.addons && product.addons.length > 0);
 
+  // منتج فيه أحجام/إضافات لازم ينفتح للتفاصيل، مش ينضاف مباشرة بسعر غلط
+  const handleQuickAdd = () => {
+    if (hasOptions && onOpenDetail) onOpenDetail();
+    else onAdd();
+  };
+
   return (
-    <motion.div
-      layout
-      initial={{ opacity: 0, y: 10 }}
+    <motion.article
+      initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
-      onClick={onOpenDetail}
-      className="group bg-surface rounded-2xl shadow-soft hover:shadow-brand border border-line hover:border-brand/30 transition-all p-3 flex gap-3 cursor-pointer"
+      transition={{
+        delay: Math.min(index, 8) * 0.04,
+        duration: 0.35,
+        ease: [0.22, 1, 0.36, 1],
+      }}
+      className="group relative bg-surface rounded-2xl shadow-soft hover:shadow-brand border border-line hover:border-brand/30 transition-[box-shadow,border-color] duration-300 p-3 flex gap-3"
     >
+      {/* Whole card opens details; the + button sits above it */}
+      <button
+        type="button"
+        onClick={onOpenDetail}
+        className="absolute inset-0 rounded-2xl"
+        aria-label={`View ${product.name}`}
+      />
+
       {/* Image */}
-      <div className="relative w-28 h-28 rounded-xl overflow-hidden bg-cream flex-shrink-0">
+      <div className="relative w-24 h-24 sm:w-28 sm:h-28 rounded-xl overflow-hidden bg-cream shrink-0">
         {product.image_url ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={product.image_url}
-            alt={product.name}
+            alt=""
+            loading="lazy"
+            decoding="async"
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
           />
         ) : (
@@ -52,62 +73,63 @@ export default function ProductCard({
         )}
 
         {hasDiscount && (
-          <div className="absolute top-2 left-2 bg-amber-custom text-white text-xs font-bold px-2 py-1 rounded-lg shadow-lg">
-            {discountPercent}% OFF
+          <div className="absolute top-1.5 left-1.5 bg-amber-custom text-white text-[11px] font-bold px-1.5 py-0.5 rounded-md shadow-md">
+            -{discountPercent}%
           </div>
         )}
 
         {product.featured && !hasDiscount && (
-          <div className="absolute top-2 left-2 bg-brand text-white text-xs font-bold px-2 py-1 rounded-lg shadow-lg flex items-center gap-1">
-            ⭐
+          <div className="absolute top-1.5 left-1.5 bg-brand text-white p-1 rounded-md shadow-md">
+            <Star size={12} className="fill-current" aria-label="Featured" />
           </div>
         )}
       </div>
 
       {/* Info */}
-      <div className="flex-1 min-w-0 flex flex-col py-1">
-        <h3 className="font-bold text-ink line-clamp-1 text-base">
+      <div className="flex-1 min-w-0 flex flex-col py-0.5">
+        <h3 dir="auto" className="font-bold text-ink line-clamp-1 text-base">
           {product.name}
         </h3>
 
         {product.description && (
-          <p className="text-sm text-ink-muted line-clamp-2 mt-1 leading-relaxed">
+          <p
+            dir="auto"
+            className="text-sm text-ink-muted line-clamp-2 mt-1 leading-relaxed"
+          >
             {product.description}
           </p>
         )}
 
         {hasOptions && (
-          <p className="text-xs text-brand font-medium mt-1">
+          <p className="text-xs text-brand font-medium mt-1.5 flex items-center gap-1">
+            <SlidersHorizontal size={12} />
             اضغط للتفاصيل والإضافات
           </p>
         )}
 
-        <div className="mt-auto flex items-end justify-between gap-2 pt-3">
-          <div className="flex items-baseline gap-2">
-            <span className="font-bold text-brand text-lg">
+        <div className="mt-auto flex items-end justify-between gap-2 pt-2">
+          <div className="flex flex-wrap items-baseline gap-x-2">
+            <span className="font-bold text-brand text-lg tabular-nums">
               {formatCurrency(displayPrice, currency)}
             </span>
             {hasDiscount && (
-              <span className="text-sm text-ink-muted line-through">
+              <span className="text-sm text-ink-muted line-through tabular-nums">
                 {formatCurrency(product.price, currency)}
               </span>
             )}
           </div>
 
           <motion.button
-            whileTap={{ scale: 0.9 }}
-            whileHover={{ scale: 1.05 }}
-            onClick={(e) => {
-              e.stopPropagation();
-              onAdd();
-            }}
-            className="w-10 h-10 rounded-xl bg-gradient-to-br from-brand to-brand-dark hover:shadow-brand-lg text-white flex items-center justify-center shadow-md transition"
-            aria-label="Add to cart"
+            type="button"
+            whileTap={{ scale: 0.88 }}
+            onClick={handleQuickAdd}
+            className="relative z-10 w-11 h-11 rounded-xl bg-gradient-to-br from-brand to-brand-dark text-white flex items-center justify-center shadow-md hover:shadow-brand-lg transition-shadow shrink-0"
+            aria-label={`Add ${product.name} to cart`}
           >
             <Plus size={20} strokeWidth={2.5} />
           </motion.button>
         </div>
       </div>
-    </motion.div>
+    </motion.article>
   );
 }

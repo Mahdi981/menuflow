@@ -3,7 +3,21 @@
 import { useEffect, useState } from 'react';
 import { Bell, BellOff, Loader2 } from 'lucide-react';
 
-export default function NotificationButton() {
+type Tone = 'light' | 'dark';
+
+// ألوان النص حسب الخلفية: 400 على الداكن، 700 على الفاتح
+const TEXT = {
+  gray: { light: 'text-gray-600', dark: 'text-gray-400' },
+  green: { light: 'text-green-700', dark: 'text-green-400' },
+  red: { light: 'text-red-700', dark: 'text-red-400' },
+  orange: { light: 'text-orange-700', dark: 'text-orange-400' },
+} as const;
+
+export default function NotificationButton({
+  tone = 'light',
+}: {
+  tone?: Tone;
+}) {
   const [permission, setPermission] = useState<NotificationPermission>('default');
   const [supported, setSupported] = useState(true);
   const [loading, setLoading] = useState(false);
@@ -60,8 +74,8 @@ export default function NotificationButton() {
   if (!supported) {
     return (
       <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-gray-500/10 border border-gray-500/30">
-        <BellOff size={14} className="text-gray-400" />
-        <span className="text-xs font-medium text-gray-400">
+        <BellOff size={14} className={TEXT.gray[tone]} />
+        <span className={`hidden sm:inline text-xs font-medium ${TEXT.gray[tone]}`}>
           Not supported
         </span>
       </div>
@@ -72,8 +86,8 @@ export default function NotificationButton() {
   if (permission === 'granted') {
     return (
       <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-green-500/10 border border-green-500/30">
-        <Bell size={14} className="text-green-400" />
-        <span className="text-xs font-medium text-green-400">
+        <Bell size={14} className={TEXT.green[tone]} />
+        <span className={`hidden sm:inline text-xs font-medium ${TEXT.green[tone]}`}>
           Notifications On
         </span>
       </div>
@@ -89,10 +103,13 @@ export default function NotificationButton() {
             'Notifications blocked. To enable:\n\n1. Click the 🔒 lock icon next to the URL\n2. Set Notifications to "Allow"\n3. Refresh the page'
           )
         }
+        aria-label="Notifications blocked"
         className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-red-500/10 border border-red-500/30 hover:bg-red-500/20 transition"
       >
-        <BellOff size={14} className="text-red-400" />
-        <span className="text-xs font-medium text-red-400">Blocked</span>
+        <BellOff size={14} className={TEXT.red[tone]} />
+        <span className={`hidden sm:inline text-xs font-medium ${TEXT.red[tone]}`}>
+          Blocked
+        </span>
       </button>
     );
   }
@@ -102,14 +119,15 @@ export default function NotificationButton() {
     <button
       onClick={request}
       disabled={loading}
+      aria-label="Enable notifications"
       className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-orange-500/10 border border-orange-500/30 hover:bg-orange-500/20 transition disabled:opacity-50"
     >
       {loading ? (
-        <Loader2 size={14} className="text-orange-400 animate-spin" />
+        <Loader2 size={14} className={`animate-spin ${TEXT.orange[tone]}`} />
       ) : (
-        <Bell size={14} className="text-orange-400" />
+        <Bell size={14} className={TEXT.orange[tone]} />
       )}
-      <span className="text-xs font-medium text-orange-400">
+      <span className={`hidden sm:inline text-xs font-medium ${TEXT.orange[tone]}`}>
         {loading ? 'Requesting...' : 'Enable Notifications'}
       </span>
     </button>

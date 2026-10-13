@@ -14,6 +14,7 @@ import {
   Check,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import PageSkeleton from '@/components/dashboard/PageSkeleton';
 import { useRestaurant } from '@/lib/hooks/useRestaurant';
 import { uploadImage } from '@/lib/utils/uploadImage';
 
@@ -77,9 +78,7 @@ export default function SettingsPage() {
 
   if (restaurantLoading || !form) {
     return (
-      <div className="min-h-screen bg-cream flex items-center justify-center">
-        <Loader2 size={32} className="animate-spin text-brand" />
-      </div>
+      <PageSkeleton />
     );
   }
 

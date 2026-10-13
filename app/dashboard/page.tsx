@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useRestaurant } from '@/lib/hooks/useRestaurant';
+import { formatCurrency } from '@/lib/utils/formatCurrency';
 import { usePlanLimits, formatLimit } from '@/lib/hooks/usePlanLimits';
 import { useSubscription } from '@/lib/hooks/useSubscription';
 import UpgradeBanner from '@/components/UpgradeBanner';
@@ -131,11 +132,7 @@ export default function OverviewPage() {
   }, [restaurant?.id]);
 
   if (restaurantLoading) {
-    return (
-      <div className="min-h-screen bg-cream p-8 flex items-center justify-center">
-        <div className="w-8 h-8 rounded-full border-2 border-brand border-t-transparent animate-spin" />
-      </div>
-    );
+    return <OverviewSkeleton />;
   }
 
   if (!restaurant) {
@@ -188,18 +185,21 @@ export default function OverviewPage() {
           label="Today's Orders"
           value={stats.todayOrders.toString()}
           delay={0}
+          loading={loading}
         />
         <StatCard
           icon={<DollarSign size={20} />}
           label="Today's Revenue"
-          value={`$${stats.todayRevenue.toFixed(2)}`}
+          value={formatCurrency(stats.todayRevenue, restaurant.currency)}
           delay={0.05}
+          loading={loading}
         />
         <StatCard
           icon={<Users size={20} />}
           label="Customers"
           value={stats.totalCustomers.toString()}
           delay={0.1}
+          loading={loading}
         />
         <StatCard
           icon={<Clock size={20} />}
@@ -207,6 +207,8 @@ export default function OverviewPage() {
           value={stats.pendingOrders.toString()}
           delay={0.15}
           highlight={stats.pendingOrders > 0}
+          loading={loading}
+          href="/dashboard/orders"
         />
       </div>
 
@@ -270,8 +272,17 @@ export default function OverviewPage() {
         </div>
 
         {loading ? (
-          <div className="text-center py-8">
-            <div className="w-6 h-6 rounded-full border-2 border-brand border-t-transparent animate-spin mx-auto" />
+          <div className="space-y-2" aria-busy="true">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="flex items-center gap-3 p-3">
+                <div className="skeleton w-10 h-10 shrink-0" />
+                <div className="flex-1 space-y-2">
+                  <div className="skeleton h-3.5 w-32" />
+                  <div className="skeleton h-3 w-24" />
+                </div>
+                <div className="skeleton h-4 w-14" />
+              </div>
+            ))}
           </div>
         ) : recentOrders.length === 0 ? (
           <div className="text-center py-12">
@@ -303,7 +314,7 @@ export default function OverviewPage() {
                   </p>
                 </div>
                 <span className="font-bold text-brand text-sm">
-                  ${Number(order.total ?? 0).toFixed(2)}
+                  {formatCurrency(Number(order.total ?? 0), restaurant.currency)}
                 </span>
               </Link>
             ))}
@@ -320,21 +331,25 @@ function StatCard({
   value,
   delay,
   highlight,
+  loading,
+  href,
 }: {
   icon: React.ReactNode;
   label: string;
   value: string;
   delay: number;
   highlight?: boolean;
+  loading?: boolean;
+  href?: string;
 }) {
-  return (
+  const card = (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay }}
-      className={`bg-surface border rounded-2xl p-4 md:p-5 shadow-soft ${
-        highlight ? 'border-amber-custom/40' : 'border-line'
-      }`}
+      className={`h-full bg-surface border rounded-2xl p-4 md:p-5 shadow-soft transition-[box-shadow,transform] duration-300 ${
+        href ? 'hover:shadow-brand hover:-translate-y-0.5' : ''
+      } ${highlight ? 'border-amber-custom/40' : 'border-line'}`}
     >
       <div
         className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${
@@ -345,9 +360,48 @@ function StatCard({
       >
         {icon}
       </div>
-      <p className="text-xs text-ink-muted uppercase tracking-wider">{label}</p>
-      <p className="text-xl md:text-2xl font-bold text-ink mt-1">{value}</p>
+      <p className="text-[11px] sm:text-xs text-ink-muted uppercase tracking-wider truncate">
+        {label}
+      </p>
+      {loading ? (
+        <div className="skeleton h-7 w-16 mt-1.5" />
+      ) : (
+        <p className="text-xl md:text-2xl font-bold text-ink mt-1 tabular-nums truncate">
+          {value}
+        </p>
+      )}
     </motion.div>
+  );
+
+  return href ? (
+    <Link href={href} className="block rounded-2xl">
+      {card}
+    </Link>
+  ) : (
+    card
+  );
+}
+
+function OverviewSkeleton() {
+  return (
+    <div className="min-h-screen bg-cream p-4 md:p-6" aria-busy="true">
+      <div className="skeleton h-8 w-56 mb-2" />
+      <div className="skeleton h-4 w-72 max-w-full mb-6" />
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-6">
+        {[0, 1, 2, 3].map((i) => (
+          <div
+            key={i}
+            className="bg-surface border border-line rounded-2xl p-4 md:p-5"
+          >
+            <div className="skeleton w-10 h-10 mb-3" />
+            <div className="skeleton h-3 w-20 mb-2" />
+            <div className="skeleton h-7 w-16" />
+          </div>
+        ))}
+      </div>
+      <div className="bg-surface border border-line rounded-2xl h-40 mb-6" />
+      <div className="bg-surface border border-line rounded-2xl h-64" />
+    </div>
   );
 }
 

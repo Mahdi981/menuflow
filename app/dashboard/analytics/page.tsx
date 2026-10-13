@@ -7,7 +7,6 @@ import {
   ShoppingBag,
   TrendingUp,
   Users,
-  Loader2,
   Trophy,
   BarChart3,
 } from 'lucide-react';
@@ -21,7 +20,9 @@ import {
   CartesianGrid,
 } from 'recharts';
 import { createClient } from '@/lib/supabase/client';
+import PageSkeleton from '@/components/dashboard/PageSkeleton';
 import { useRestaurant } from '@/lib/hooks/useRestaurant';
+import { formatCurrency } from '@/lib/utils/formatCurrency';
 
 const supabase = createClient();
 
@@ -145,9 +146,7 @@ export default function AnalyticsPage() {
 
   if (restaurantLoading || loading) {
     return (
-      <div className="min-h-screen bg-cream flex items-center justify-center">
-        <Loader2 size={32} className="animate-spin text-brand" />
-      </div>
+      <PageSkeleton />
     );
   }
 
@@ -199,7 +198,7 @@ export default function AnalyticsPage() {
         <StatCard
           icon={<DollarSign size={18} />}
           label="Revenue"
-          value={`$${stats.revenue.toFixed(2)}`}
+          value={formatCurrency(stats.revenue, restaurant.currency)}
           color="green"
         />
         <StatCard
@@ -211,7 +210,7 @@ export default function AnalyticsPage() {
         <StatCard
           icon={<TrendingUp size={18} />}
           label="Avg Order"
-          value={`$${stats.avg.toFixed(2)}`}
+          value={formatCurrency(stats.avg, restaurant.currency)}
           color="brand"
         />
         <StatCard
@@ -257,7 +256,12 @@ export default function AnalyticsPage() {
                 fontSize={11}
                 tickLine={false}
                 axisLine={false}
-                tickFormatter={(v) => `$${v}`}
+                tickFormatter={(v) =>
+                  formatCurrency(Number(v), restaurant.currency).replace(
+                    '.00',
+                    ''
+                  )
+                }
               />
               <Tooltip
                 contentStyle={{
@@ -268,7 +272,7 @@ export default function AnalyticsPage() {
                   boxShadow: '0 4px 20px -5px rgba(0, 0, 0, 0.08)',
                 }}
                 formatter={(value: any) => [
-                  `$${Number(value).toFixed(2)}`,
+                  formatCurrency(Number(value), restaurant.currency),
                   'Revenue',
                 ]}
               />
@@ -329,7 +333,7 @@ export default function AnalyticsPage() {
                         {p.name}
                       </p>
                       <p className="text-xs text-ink-muted shrink-0">
-                        {p.qty} sold · ${p.revenue.toFixed(2)}
+                        {p.qty} sold · {formatCurrency(p.revenue, restaurant.currency)}
                       </p>
                     </div>
                     <div className="h-1.5 bg-cream rounded-full overflow-hidden">

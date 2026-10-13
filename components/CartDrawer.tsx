@@ -6,6 +6,7 @@ import { X, Minus, Plus, Trash2, Pencil } from 'lucide-react';
 import type { Restaurant } from '@/lib/types/menu';
 import { useCart } from '@/lib/store/cart';
 import { formatCurrency } from '@/lib/utils/formatCurrency';
+import { useModalBehavior } from '@/lib/hooks/useModalBehavior';
 import CheckoutModal from './CheckoutModal';
 
 export default function CartDrawer({
@@ -28,6 +29,8 @@ export default function CartDrawer({
   const [noteDraft, setNoteDraft] = useState('');
 
   const sub = subtotal();
+
+  useModalBehavior(open, onClose);
 
   const handleEditNote = (cartItemId: string, currentNote: string | null) => {
     setEditingNoteId(cartItemId);
@@ -52,21 +55,27 @@ export default function CartDrawer({
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={onClose}
-              className="fixed inset-0 bg-black/40 z-50"
+              className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50"
             />
             <motion.div
               initial={{ y: '100%' }}
               animate={{ y: 0 }}
               exit={{ y: '100%' }}
               transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-              className="fixed bottom-0 left-0 right-0 z-50 bg-surface rounded-t-3xl max-h-[90vh] flex flex-col max-w-3xl mx-auto shadow-2xl"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="cart-title"
+              className="fixed bottom-0 left-0 right-0 z-50 bg-surface rounded-t-3xl max-h-[90dvh] flex flex-col max-w-3xl mx-auto shadow-2xl"
             >
               {/* Header */}
               <div className="flex items-center justify-between p-4 border-b border-line shrink-0">
-                <h2 className="text-lg font-bold text-ink">Your Order</h2>
+                <h2 id="cart-title" className="text-lg font-bold text-ink">
+                  Your Order
+                </h2>
                 <button
                   onClick={onClose}
-                  className="p-2 hover:bg-cream rounded-full text-ink-muted"
+                  className="p-2.5 -m-1 hover:bg-cream rounded-full text-ink-muted transition-colors"
+                  aria-label="Close cart"
                 >
                   <X size={20} />
                 </button>
@@ -93,12 +102,12 @@ export default function CartDrawer({
                   >
                     {/* Main row */}
                     <div className="flex gap-3 items-start">
-                      <div className="w-14 h-14 rounded-xl bg-white overflow-hidden flex-shrink-0">
+                      <div className="w-14 h-14 rounded-xl bg-surface overflow-hidden flex-shrink-0">
                         {item.image_url ? (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img
                             src={item.image_url}
-                            alt={item.name}
+                            alt=""
                             className="w-full h-full object-cover"
                           />
                         ) : (
@@ -109,7 +118,7 @@ export default function CartDrawer({
                       </div>
 
                       <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-sm text-ink truncate">
+                        <p dir="auto" className="font-semibold text-sm text-ink truncate">
                           {item.name}
                         </p>
 
@@ -135,7 +144,8 @@ export default function CartDrawer({
 
                       <button
                         onClick={() => removeItem(item.cart_item_id)}
-                        className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg shrink-0"
+                        className="p-2 -m-1 text-red-500 hover:bg-red-500/10 rounded-lg shrink-0 transition-colors"
+                        aria-label={`Remove ${item.name}`}
                       >
                         <Trash2 size={16} />
                       </button>
@@ -155,11 +165,11 @@ export default function CartDrawer({
                               if (e.key === 'Enter') handleSaveNote();
                               if (e.key === 'Escape') setEditingNoteId(null);
                             }}
-                            className="flex-1 bg-white border border-line rounded-lg px-3 py-1.5 text-xs text-ink placeholder:text-ink-muted/50 focus:outline-none focus:border-brand"
+                            className="flex-1 bg-surface border border-line rounded-lg px-3 py-2 text-sm text-ink placeholder:text-ink-muted/50 focus:outline-none focus:border-brand"
                           />
                           <button
                             onClick={handleSaveNote}
-                            className="px-3 py-1.5 rounded-lg bg-brand text-white text-xs font-semibold"
+                            className="px-3 py-2 rounded-lg bg-brand hover:bg-brand-dark text-white text-xs font-semibold transition-colors"
                           >
                             حفظ
                           </button>
@@ -196,18 +206,20 @@ export default function CartDrawer({
                           onClick={() =>
                             updateQty(item.cart_item_id, item.qty - 1)
                           }
-                          className="w-8 h-8 rounded-full bg-white hover:bg-brand/10 flex items-center justify-center text-ink transition"
+                          className="w-9 h-9 rounded-full bg-surface border border-line hover:bg-brand/10 flex items-center justify-center text-ink transition-colors"
+                          aria-label="Decrease quantity"
                         >
                           <Minus size={14} />
                         </button>
-                        <span className="w-8 text-center font-bold text-sm text-ink">
+                        <span className="w-8 text-center font-bold text-sm text-ink tabular-nums">
                           {item.qty}
                         </span>
                         <button
                           onClick={() =>
                             updateQty(item.cart_item_id, item.qty + 1)
                           }
-                          className="w-8 h-8 rounded-full bg-brand hover:bg-brand-dark text-white flex items-center justify-center transition"
+                          className="w-9 h-9 rounded-full bg-brand hover:bg-brand-dark text-white flex items-center justify-center transition-colors"
+                          aria-label="Increase quantity"
                         >
                           <Plus size={14} />
                         </button>
@@ -219,7 +231,7 @@ export default function CartDrawer({
 
               {/* Footer */}
               {items.length > 0 && (
-                <div className="border-t border-line p-4 space-y-3 shrink-0">
+                <div className="border-t border-line p-4 pb-safe space-y-3 shrink-0">
                   <div className="flex justify-between text-sm">
                     <span className="text-ink-muted">Subtotal</span>
                     <span className="font-semibold text-ink">

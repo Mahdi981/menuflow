@@ -1,3 +1,5 @@
+import type { CSSProperties } from 'react';
+
 export type ThemePreset = {
   id: string;
   name: string;
@@ -85,6 +87,42 @@ export const THEME_PRESETS: ThemePreset[] = [
 
 export function getPreset(id: string | null | undefined): ThemePreset {
   return THEME_PRESETS.find((p) => p.id === id) ?? THEME_PRESETS[0];
+}
+
+function isDarkColor(hex: string): boolean {
+  const clean = hex.replace('#', '');
+  if (clean.length < 6) return false;
+  const r = parseInt(clean.substring(0, 2), 16);
+  const g = parseInt(clean.substring(2, 4), 16);
+  const b = parseInt(clean.substring(4, 6), 16);
+  // Perceived luminance (0–255)
+  return 0.299 * r + 0.587 * g + 0.114 * b < 128;
+}
+
+/**
+ * يبني كل CSS variables اللي بتستعملها صفحة المنيو من ألوان المطعم،
+ * عشان ما يضل في لون ثابت (أبيض / تيل) يكسر الثيمات الداكنة.
+ */
+export function buildThemeVars(theme: {
+  primary: string;
+  accent: string;
+  bg: string;
+  text: string;
+}): CSSProperties {
+  const dark = isDarkColor(theme.bg);
+  return {
+    '--color-brand': theme.primary,
+    '--color-brand-dark': `color-mix(in srgb, ${theme.primary} 78%, black)`,
+    '--color-amber-custom': theme.accent,
+    '--color-cream': theme.bg,
+    '--color-ink': theme.text,
+    '--color-ink-muted': `color-mix(in srgb, ${theme.text} 62%, ${theme.bg})`,
+    '--color-surface': dark
+      ? `color-mix(in srgb, ${theme.bg} 88%, white)`
+      : '#FFFFFF',
+    '--color-line': `color-mix(in srgb, ${theme.text} ${dark ? 16 : 10}%, ${theme.bg})`,
+    colorScheme: dark ? 'dark' : 'light',
+  } as CSSProperties;
 }
 
 /**

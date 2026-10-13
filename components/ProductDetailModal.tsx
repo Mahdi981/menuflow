@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import type { Product } from '@/lib/types/menu';
 import { formatCurrency } from '@/lib/utils/formatCurrency';
+import { useModalBehavior } from '@/lib/hooks/useModalBehavior';
 
 type Props = {
   product: Product | null;
@@ -74,6 +75,8 @@ export default function ProductDetailModal({
 
   const totalPrice = (basePrice + addonsTotal) * qty;
 
+  useModalBehavior(open, onClose);
+
   const toggleAddon = (id: string) => {
     const next = new Set(selectedAddons);
     if (next.has(id)) next.delete(id);
@@ -119,16 +122,24 @@ export default function ProductDetailModal({
             animate={{ y: 0 }}
             exit={{ y: '100%' }}
             transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-            className="fixed bottom-0 left-0 right-0 z-50 bg-surface rounded-t-3xl max-h-[90vh] overflow-y-auto max-w-2xl mx-auto shadow-2xl"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="product-detail-title"
+            className="fixed bottom-0 left-0 right-0 z-50 bg-surface rounded-t-3xl max-h-[90dvh] overflow-y-auto overscroll-contain max-w-2xl mx-auto shadow-2xl"
           >
             {/* Header */}
             <div className="sticky top-0 bg-surface z-10 flex items-center justify-between p-4 border-b border-line">
-              <h2 className="text-lg font-bold text-ink truncate pr-4">
+              <h2
+                id="product-detail-title"
+                dir="auto"
+                className="text-lg font-bold text-ink truncate pe-4"
+              >
                 {product.name}
               </h2>
               <button
                 onClick={onClose}
-                className="p-2 hover:bg-cream rounded-full text-ink-muted shrink-0"
+                className="p-2.5 -m-1 hover:bg-cream rounded-full text-ink-muted shrink-0 transition-colors"
+                aria-label="Close"
               >
                 <X size={20} />
               </button>
@@ -156,7 +167,7 @@ export default function ProductDetailModal({
 
               {/* Description */}
               {product.description && (
-                <p className="text-sm text-ink-muted leading-relaxed">
+                <p dir="auto" className="text-sm text-ink-muted leading-relaxed">
                   {product.description}
                 </p>
               )}
@@ -172,7 +183,7 @@ export default function ProductDetailModal({
                       <button
                         key={v.id}
                         onClick={() => setSelectedVariantId(v.id)}
-                        className={`p-3 rounded-xl border-2 font-medium text-sm transition text-left ${
+                        className={`p-3 rounded-xl border-2 font-medium text-sm transition text-start ${
                           selectedVariantId === v.id
                             ? 'border-brand bg-brand/5 text-brand'
                             : 'border-line text-ink-muted hover:border-brand/30'
@@ -256,7 +267,7 @@ export default function ProductDetailModal({
                   onChange={(e) => setNotes(e.target.value)}
                   rows={2}
                   placeholder="مثلاً: بدون بصلة، حار شوي..."
-                  className="w-full bg-white border border-line rounded-xl px-4 py-3 text-sm text-ink placeholder:text-ink-muted/50 focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 resize-none"
+                  className="w-full bg-surface border border-line rounded-xl px-4 py-3 text-sm text-ink placeholder:text-ink-muted/50 focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 resize-none"
                 />
               </div>
 
@@ -266,16 +277,19 @@ export default function ProductDetailModal({
                 <div className="flex items-center gap-4">
                   <button
                     onClick={() => setQty(Math.max(1, qty - 1))}
-                    className="w-10 h-10 rounded-xl bg-cream hover:bg-brand/10 text-ink flex items-center justify-center transition"
+                    className="w-11 h-11 rounded-xl bg-cream hover:bg-brand/10 disabled:opacity-40 text-ink flex items-center justify-center transition-colors"
+                    disabled={qty <= 1}
+                    aria-label="Decrease quantity"
                   >
                     <Minus size={18} />
                   </button>
-                  <span className="text-xl font-bold text-ink w-12 text-center">
+                  <span className="text-xl font-bold text-ink w-12 text-center tabular-nums" aria-live="polite">
                     {qty}
                   </span>
                   <button
                     onClick={() => setQty(qty + 1)}
-                    className="w-10 h-10 rounded-xl bg-brand hover:bg-brand-dark text-white flex items-center justify-center transition"
+                    className="w-11 h-11 rounded-xl bg-brand hover:bg-brand-dark text-white flex items-center justify-center transition-colors"
+                    aria-label="Increase quantity"
                   >
                     <Plus size={18} />
                   </button>
@@ -284,16 +298,16 @@ export default function ProductDetailModal({
             </div>
 
             {/* Footer - Add to cart */}
-            <div className="sticky bottom-0 bg-surface border-t border-line p-4">
+            <div className="sticky bottom-0 bg-surface/95 backdrop-blur border-t border-line p-4 pb-safe">
               <button
                 onClick={handleAdd}
-                className="w-full flex items-center justify-between gap-3 py-4 px-5 rounded-2xl bg-gradient-to-r from-brand to-brand-dark hover:opacity-90 text-white font-bold shadow-brand transition"
+                className="w-full flex items-center justify-between gap-3 py-4 px-5 rounded-2xl bg-gradient-to-r from-brand to-brand-dark hover:opacity-90 active:scale-[0.98] text-white font-bold shadow-brand transition"
               >
                 <span className="flex items-center gap-2">
                   <ShoppingBag size={20} />
                   إضافة للسلة
                 </span>
-                <span className="text-lg">
+                <span className="text-lg tabular-nums">
                   {formatCurrency(totalPrice, currency)}
                 </span>
               </button>
