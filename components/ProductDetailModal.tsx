@@ -13,6 +13,7 @@ import {
 import type { Product } from '@/lib/types/menu';
 import { formatCurrency } from '@/lib/utils/formatCurrency';
 import { useModalBehavior } from '@/lib/hooks/useModalBehavior';
+import { unitPrice } from '@/lib/pricing';
 
 type Props = {
   product: Product | null;
@@ -47,33 +48,30 @@ export default function ProductDetailModal({
     if (product) {
       setQty(1);
       const defaultVariant =
-        product.variants?.find((v) => v.is_default) ??
-        product.variants?.[0];
+        product.variants?.find((v) => v.is_default && v.is_available) ??
+        product.variants?.find((v) => v.is_available);
       setSelectedVariantId(defaultVariant?.id ?? null);
       setSelectedAddons(new Set());
       setNotes('');
     }
   }, [product]);
 
+  const availableVariants = (product?.variants ?? []).filter(
+    (v) => v.is_available
+  );
+
   const selectedVariant = useMemo(
     () => product?.variants?.find((v) => v.id === selectedVariantId) ?? null,
     [product, selectedVariantId]
   );
 
-  const basePrice = useMemo(() => {
+  const totalPrice = useMemo(() => {
     if (!product) return 0;
-    if (selectedVariant) return selectedVariant.price;
-    return product.discount_price ?? product.price;
-  }, [product, selectedVariant]);
-
-  const addonsTotal = useMemo(() => {
-    if (!product?.addons) return 0;
-    return product.addons
-      .filter((a) => selectedAddons.has(a.id))
-      .reduce((s, a) => s + a.price, 0);
-  }, [product, selectedAddons]);
-
-  const totalPrice = (basePrice + addonsTotal) * qty;
+    const addons = (product.addons ?? []).filter((a) =>
+      selectedAddons.has(a.id)
+    );
+    return unitPrice(product, selectedVariant, addons) * qty;
+  }, [product, selectedVariant, selectedAddons, qty]);
 
   useModalBehavior(open, onClose);
 
@@ -173,13 +171,13 @@ export default function ProductDetailModal({
               )}
 
               {/* Variants */}
-              {product.variants && product.variants.length > 0 && (
+              {availableVariants.length > 0 && (
                 <div>
                   <h3 className="text-sm font-bold text-ink mb-3">
                     اختر الحجم
                   </h3>
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                    {product.variants.map((v) => (
+                    {availableVariants.map((v) => (
                       <button
                         key={v.id}
                         onClick={() => setSelectedVariantId(v.id)}

@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, MotionConfig, motion } from 'framer-motion';
 import type { FullMenu, Category, Product } from '@/lib/types/menu';
 import MenuHeader from '@/components/MenuHeader';
@@ -26,6 +26,18 @@ export default function MenuClient({ menu }: { menu: FullMenu }) {
     s.items.reduce((a, i) => a + i.price * i.qty, 0)
   );
   const addItem = useCart((s) => s.addItem);
+  const syncWithMenu = useCart((s) => s.syncWithMenu);
+
+  // حدّث أسعار السلة المحفوظة من المنيو الحالي (بعد ما يتحمّل الـ localStorage)
+  useEffect(() => {
+    const sync = () =>
+      syncWithMenu(menu.slug, [
+        ...menu.categories.flatMap((c) => c.products),
+        ...menu.uncategorized,
+      ]);
+    if (useCart.persist.hasHydrated()) sync();
+    return useCart.persist.onFinishHydration(sync);
+  }, [menu, syncWithMenu]);
 
   const allCategories: (Category & { products: Product[] })[] = [
     ...menu.categories,

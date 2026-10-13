@@ -5,27 +5,40 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, Loader2, Tag, Check, AlertCircle, Phone } from 'lucide-react';
 import type { Restaurant, OrderType } from '@/lib/types/menu';
 import { useCart } from '@/lib/store/cart';
-import { createClient } from '@/lib/supabase/client';
 import { formatCurrency } from '@/lib/utils/formatCurrency';
 import { itemsLabel } from '@/lib/utils/arabic';
 import { useModalBehavior } from '@/lib/hooks/useModalBehavior';
+import { couponDiscount, roundMoney } from '@/lib/pricing';
+import { isValidLebanesePhone } from '@/lib/validation';
 import LocationPicker, { type LocationData } from './LocationPicker';
-import { isOpenNow } from '@/lib/types/hours';
-
-const supabase = createClient();
 
 type Offer = {
-  id: string;
   code: string;
-  description: string | null;
   discount_type: 'percentage' | 'fixed';
   discount_value: number;
-  min_order: number;
-  max_uses: number | null;
-  uses_count: number;
-  expires_at: string | null;
-  is_active: boolean;
 };
+
+const NETWORK_ERROR = 'تعذّر الاتصال، تأكد من الإنترنت وحاول مرة أخرى';
+
+async function postJson<T>(
+  url: string,
+  body: unknown
+): Promise<{ ok: true; data: T } | { ok: false; error: string }> {
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      return { ok: false, error: data.error ?? NETWORK_ERROR };
+    }
+    return { ok: true, data: data as T };
+  } catch {
+    return { ok: false, error: NETWORK_ERROR };
+  }
+}
 
 type OrderResult = {
   order_number: string;
@@ -80,24 +93,9 @@ export default function CheckoutModal({
   const sub = subtotal();
   const deliveryFee = orderType === 'delivery' ? restaurant.delivery_fee : 0;
 
-  const discountAmount = appliedOffer
-    ? appliedOffer.discount_type === 'percentage'
-      ? (sub * appliedOffer.discount_value) / 100
-      : Math.min(appliedOffer.discount_value, sub)
-    : 0;
-
-  const total = Math.max(0, sub - discountAmount + deliveryFee);
-
-  const validateLebanesePhone = (p: string): boolean => {
-    const cleaned = p.replace(/\D/g, '');
-    if (cleaned.length !== 7 && cleaned.length !== 8) return false;
-    return /^(3|70|71|76|78|79|81)/.test(cleaned);
-  };
-
-  const formatPhone = (p: string): string => {
-    const cleaned = p.replace(/\D/g, '');
-    return `+961${cleaned}`;
-  };
+  // للعرض بس — السيرفر بيعيد حساب كل شي (lib/pricing)
+  const discountAmount = couponDiscount(appliedOffer, sub);
+  const total = roundMoney(Math.max(0, sub - discountAmount + deliveryFee));
 
   const applyCoupon = async () => {
     const code = couponCode.trim().toUpperCase();
@@ -106,42 +104,20 @@ export default function CheckoutModal({
     setCouponLoading(true);
     setCouponError(null);
 
-    const { data, error } = await supabase
-      .from('offers')
-      .select('*')
-      .eq('restaurant_id', restaurant.id)
-      .eq('code', code)
-      .eq('is_active', true)
-      .maybeSingle();
+    const res = await postJson<{ coupon: Offer }>('/api/orders/coupon', {
+      restaurant_id: restaurant.id,
+      code,
+      subtotal: sub,
+    });
 
     setCouponLoading(false);
 
-    if (error || !data) {
-      setCouponError('كود الخصم غير صحيح');
+    if (!res.ok) {
+      setCouponError(res.error);
       return;
     }
 
-    const offer = data as Offer;
-
-    if (offer.expires_at && new Date(offer.expires_at) < new Date()) {
-      setCouponError('انتهت صلاحية كود الخصم');
-      return;
-    }
-
-    if (offer.max_uses !== null && offer.uses_count >= offer.max_uses) {
-      setCouponError('وصل كود الخصم للحد الأقصى من الاستخدام');
-      return;
-    }
-
-    if (sub < offer.min_order) {
-      setCouponError(
-        `الحد الأدنى للطلب لاستخدام هذا الكود ${formatCurrency(offer.min_order, restaurant.currency)}`
-      );
-      return;
-    }
-
-    setAppliedOffer(offer);
-    setCouponError(null);
+    setAppliedOffer(res.data.coupon);
   };
 
   const removeCoupon = () => {
@@ -234,7 +210,7 @@ export default function CheckoutModal({
       return;
     }
 
-    if (!validateLebanesePhone(phone)) {
+    if (!isValidLebanesePhone(phone)) {
       setError('الرجاء إدخال رقم هاتف لبناني صحيح (مثال: 70 123 456)');
       return;
     }
@@ -257,106 +233,42 @@ export default function CheckoutModal({
 
     setLoading(true);
 
-    const formattedPhone = formatPhone(phone);
-
-    const finalAddress =
-      orderType === 'delivery'
-        ? location.type === 'map'
-          ? location.label ??
-            `${location.lat?.toFixed(5)}, ${location.lng?.toFixed(5)}`
-          : location.address ?? null
-        : null;
-
-    // 1. INSERT order
-    const { data: order, error: orderError } = await supabase
-      .from('orders')
-      .insert({
-        restaurant_id: restaurant.id,
-        customer_name: name.trim(),
-        customer_phone: formattedPhone,
-        type: orderType,
-        address: finalAddress,
-        latitude:
-          orderType === 'delivery' && location.type === 'map'
-            ? location.lat ?? null
-            : null,
-        longitude:
-          orderType === 'delivery' && location.type === 'map'
-            ? location.lng ?? null
-            : null,
-        location_type: location.type,
-        location_label: location.label ?? location.address ?? null,
-        notes: notes.trim() || null,
-        subtotal: sub,
-        delivery_fee: deliveryFee,
-        total,
-        status: 'pending',
-      })
-      .select()
-      .single();
-
-    if (orderError || !order) {
-      setLoading(false);
-      console.error('Order insert failed:', orderError);
-      setError('تعذّر إرسال الطلب، الرجاء المحاولة مرة أخرى');
-      return;
-    }
-
-    // 2. INSERT order_items مع variant + addons + notes
-    const orderItems = items.map((i) => ({
-      order_id: order.id,
-      product_id: i.product_id,
-      product_name: i.name,
-      price: i.price,
-      quantity: i.qty,
-      total: i.price * i.qty,
-      variant_name: i.variant_name ?? null,
-      addons: i.addons ?? [],
-      notes: i.notes ?? null,
-    }));
-
-    const { error: itemsError } = await supabase
-      .from('order_items')
-      .insert(orderItems);
-
-    if (itemsError) {
-      setLoading(false);
-      console.error('Order items insert failed:', itemsError);
-      setError('تعذّر إرسال الطلب، الرجاء المحاولة مرة أخرى');
-      return;
-    }
-
-    // 3. Increment offer uses
-    if (appliedOffer) {
-      await supabase
-        .from('offers')
-        .update({ uses_count: appliedOffer.uses_count + 1 })
-        .eq('id', appliedOffer.id);
-    }
-
-    const result: OrderResult = {
-      order_number: order.order_number ?? `#${order.id.slice(0, 6)}`,
+    // السيرفر بيحسب الأسعار من قاعدة البيانات — منبعت بس شو اختار الزبون
+    const res = await postJson<{ order: OrderResult }>('/api/orders', {
+      restaurant_id: restaurant.id,
       customer_name: name.trim(),
-      customer_phone: formattedPhone,
-      order_type: orderType,
-      address: finalAddress,
+      customer_phone: phone,
+      type: orderType,
+      location:
+        orderType === 'delivery'
+          ? {
+              type: location.type,
+              address: location.address,
+              lat: location.lat,
+              lng: location.lng,
+              label: location.label,
+            }
+          : null,
       notes: notes.trim() || null,
+      coupon_code: appliedOffer?.code ?? null,
+      expected_total: total,
       items: items.map((i) => ({
-        name: i.name,
+        product_id: i.product_id,
+        variant_id: i.variant_id ?? null,
+        addon_ids: (i.addons ?? []).map((a) => a.id),
         qty: i.qty,
-        price: i.price,
-        variant_name: i.variant_name ?? null,
-        addons: i.addons ?? [],
         notes: i.notes ?? null,
       })),
-      subtotal: sub,
-      delivery_fee: deliveryFee,
-      discount: discountAmount,
-      total,
-    };
+    });
 
     setLoading(false);
-    setOrderResult(result);
+
+    if (!res.ok) {
+      setError(res.error);
+      return;
+    }
+
+    setOrderResult(res.data.order);
     clear();
   }
 
