@@ -133,7 +133,7 @@ export default function MapPicker({ value, onChange }: Props) {
           <ClickHandler onClick={handleMapClick} />
         </MapContainer>
 
-        <div className="absolute bottom-3 left-3 right-3 bg-white/95 backdrop-blur rounded-lg px-3 py-2 shadow-lg pointer-events-none">
+        <div className="absolute bottom-3 left-3 right-3 bg-surface/95 backdrop-blur rounded-lg px-3 py-2 shadow-lg pointer-events-none">
           <p className="text-xs text-ink-muted text-center">
             📍 اضغط على الخريطة لتحديد موقعك
           </p>

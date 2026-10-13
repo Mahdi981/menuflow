@@ -7,6 +7,7 @@ import type { Restaurant, OrderType } from '@/lib/types/menu';
 import { useCart } from '@/lib/store/cart';
 import { createClient } from '@/lib/supabase/client';
 import { formatCurrency } from '@/lib/utils/formatCurrency';
+import { itemsLabel } from '@/lib/utils/arabic';
 import { useModalBehavior } from '@/lib/hooks/useModalBehavior';
 import LocationPicker, { type LocationData } from './LocationPicker';
 import { isOpenNow } from '@/lib/types/hours';
@@ -116,25 +117,25 @@ export default function CheckoutModal({
     setCouponLoading(false);
 
     if (error || !data) {
-      setCouponError('Invalid coupon code');
+      setCouponError('كود الخصم غير صحيح');
       return;
     }
 
     const offer = data as Offer;
 
     if (offer.expires_at && new Date(offer.expires_at) < new Date()) {
-      setCouponError('This coupon has expired');
+      setCouponError('انتهت صلاحية كود الخصم');
       return;
     }
 
     if (offer.max_uses !== null && offer.uses_count >= offer.max_uses) {
-      setCouponError('This coupon has reached its limit');
+      setCouponError('وصل كود الخصم للحد الأقصى من الاستخدام');
       return;
     }
 
     if (sub < offer.min_order) {
       setCouponError(
-        `Minimum order of ${formatCurrency(offer.min_order, restaurant.currency)} required`
+        `الحد الأدنى للطلب لاستخدام هذا الكود ${formatCurrency(offer.min_order, restaurant.currency)}`
       );
       return;
     }
@@ -151,20 +152,20 @@ export default function CheckoutModal({
 
   const buildWhatsAppMessage = (order: OrderResult): string => {
     const lines: string[] = [];
-    lines.push(`🔔 *New Order ${order.order_number}*`);
+    lines.push(`🔔 *طلب جديد ${order.order_number}*`);
     lines.push('');
-    lines.push(`👤 *Customer:* ${order.customer_name}`);
-    lines.push(`📞 *Phone:* ${order.customer_phone}`);
+    lines.push(`👤 *الاسم:* ${order.customer_name}`);
+    lines.push(`📞 *الهاتف:* ${order.customer_phone}`);
     lines.push(
-      `${order.order_type === 'delivery' ? '🛵' : '🏪'} *Type:* ${order.order_type === 'delivery' ? 'Delivery' : 'Pickup'}`
+      `${order.order_type === 'delivery' ? '🛵' : '🏪'} *نوع الطلب:* ${order.order_type === 'delivery' ? 'توصيل' : 'استلام من المطعم'}`
     );
 
     if (order.address) {
-      lines.push(`📍 *Address:* ${order.address}`);
+      lines.push(`📍 *العنوان:* ${order.address}`);
     }
 
     lines.push('');
-    lines.push('📋 *Items:*');
+    lines.push('📋 *الطلبات:*');
     order.items.forEach((item) => {
       const variantText = item.variant_name ? ` (${item.variant_name})` : '';
       lines.push(
@@ -182,28 +183,28 @@ export default function CheckoutModal({
 
     lines.push('');
     lines.push(
-      `💵 Subtotal: ${formatCurrency(order.subtotal, restaurant.currency)}`
+      `💵 المجموع الفرعي: ${formatCurrency(order.subtotal, restaurant.currency)}`
     );
 
     if (order.discount > 0) {
       lines.push(
-        `🎁 Discount: -${formatCurrency(order.discount, restaurant.currency)}`
+        `🎁 الخصم: -${formatCurrency(order.discount, restaurant.currency)}`
       );
     }
 
     if (order.delivery_fee > 0) {
       lines.push(
-        `🛵 Delivery: ${formatCurrency(order.delivery_fee, restaurant.currency)}`
+        `🛵 التوصيل: ${formatCurrency(order.delivery_fee, restaurant.currency)}`
       );
     }
 
     lines.push(
-      `💰 *Total: ${formatCurrency(order.total, restaurant.currency)}*`
+      `💰 *الإجمالي: ${formatCurrency(order.total, restaurant.currency)}*`
     );
 
     if (order.notes) {
       lines.push('');
-      lines.push(`📝 *Notes:* ${order.notes}`);
+      lines.push(`📝 *ملاحظات:* ${order.notes}`);
     }
 
     return lines.join('\n');
@@ -229,12 +230,12 @@ export default function CheckoutModal({
     setError(null);
 
     if (!name.trim()) {
-      setError('Please enter your name');
+      setError('الرجاء كتابة اسمك');
       return;
     }
 
     if (!validateLebanesePhone(phone)) {
-      setError('Please enter a valid Lebanese phone number (e.g. 70 123 456)');
+      setError('الرجاء إدخال رقم هاتف لبناني صحيح (مثال: 70 123 456)');
       return;
     }
 
@@ -250,7 +251,7 @@ export default function CheckoutModal({
     }
 
     if (items.length === 0) {
-      setError('Your cart is empty');
+      setError('السلة فارغة');
       return;
     }
 
@@ -296,7 +297,8 @@ export default function CheckoutModal({
 
     if (orderError || !order) {
       setLoading(false);
-      setError(orderError?.message ?? 'Failed to place order');
+      console.error('Order insert failed:', orderError);
+      setError('تعذّر إرسال الطلب، الرجاء المحاولة مرة أخرى');
       return;
     }
 
@@ -319,7 +321,8 @@ export default function CheckoutModal({
 
     if (itemsError) {
       setLoading(false);
-      setError(itemsError.message);
+      console.error('Order items insert failed:', itemsError);
+      setError('تعذّر إرسال الطلب، الرجاء المحاولة مرة أخرى');
       return;
     }
 
@@ -395,7 +398,7 @@ export default function CheckoutModal({
             transition={{ type: 'spring', damping: 30, stiffness: 300 }}
             role="dialog"
             aria-modal="true"
-            aria-label="Checkout"
+            aria-label="إتمام الطلب"
             className="fixed bottom-0 left-0 right-0 z-[60] bg-surface rounded-t-3xl max-h-[90dvh] overflow-y-auto overscroll-contain max-w-3xl mx-auto shadow-2xl pb-safe"
           >
             {orderResult ? (
@@ -411,32 +414,28 @@ export default function CheckoutModal({
                 </motion.div>
 
                 <h2 className="text-2xl font-bold text-ink text-center mb-2">
-                  Order Placed! 🎉
+                  تم استلام طلبك! 🎉
                 </h2>
                 <p className="text-sm text-ink-muted text-center mb-6">
-                  Order{' '}
-                  <span className="font-mono font-bold text-ink">
+                  رقم الطلب{' '}
+                  <span dir="ltr" className="font-mono font-bold text-ink">
                     {orderResult.order_number}
-                  </span>{' '}
-                  has been received
+                  </span>
                 </p>
 
                 <div className="bg-cream rounded-2xl p-4 mb-6">
                   <div className="flex items-center justify-between mb-3">
-                    <span className="text-sm text-ink-muted">Total</span>
+                    <span className="text-sm text-ink-muted">الإجمالي</span>
                     <span className="text-lg font-bold text-brand">
                       {formatCurrency(orderResult.total, restaurant.currency)}
                     </span>
                   </div>
                   <div className="flex items-center justify-between text-xs text-ink-muted">
-                    <span>
-                      {orderResult.items.length} item
-                      {orderResult.items.length !== 1 ? 's' : ''}
-                    </span>
+                    <span>{itemsLabel(orderResult.items.length)}</span>
                     <span>
                       {orderResult.order_type === 'delivery'
-                        ? '🛵 Delivery'
-                        : '🏪 Pickup'}
+                        ? '🛵 توصيل'
+                        : '🏪 استلام من المطعم'}
                     </span>
                   </div>
                 </div>
@@ -459,7 +458,7 @@ export default function CheckoutModal({
                     >
                       <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z" />
                     </svg>
-                    Send on WhatsApp
+                    إرسال عبر واتساب
                   </motion.button>
                 </div>
 
@@ -467,18 +466,18 @@ export default function CheckoutModal({
                   onClick={handleDone}
                   className="w-full py-3 rounded-xl bg-cream hover:bg-brand/10 text-ink font-medium text-sm transition"
                 >
-                  Done
+                  تم
                 </button>
               </div>
             ) : (
               /* ========== FORM ========== */
               <>
                 <div className="sticky top-0 bg-surface flex items-center justify-between p-4 border-b border-line z-10">
-                  <h2 className="text-lg font-bold text-ink">Checkout</h2>
+                  <h2 className="text-lg font-bold text-ink">إتمام الطلب</h2>
                   <button
                     onClick={handleClose}
                     className="p-2.5 -m-1 hover:bg-cream rounded-full text-ink-muted transition-colors"
-                    aria-label="Close checkout"
+                    aria-label="إغلاق"
                   >
                     <X size={20} />
                   </button>
@@ -497,7 +496,7 @@ export default function CheckoutModal({
                             : 'border-line text-ink-muted'
                         }`}
                       >
-                        🛵 Delivery
+                        🛵 توصيل
                       </button>
                     )}
                     {restaurant.accepts_pickup && (
@@ -510,7 +509,7 @@ export default function CheckoutModal({
                             : 'border-line text-ink-muted'
                         }`}
                       >
-                        🏪 Pickup
+                        🏪 استلام من المطعم
                       </button>
                     )}
                   </div>
@@ -518,23 +517,25 @@ export default function CheckoutModal({
                   {/* Name */}
                   <div>
                     <label className="text-sm font-medium text-ink mb-1 block">
-                      Name *
+                      الاسم *
                     </label>
                     <input
                       required
+                      autoComplete="name"
                       value={name}
                       onChange={(e) => setName(e.target.value)}
                       className="w-full bg-surface border border-line rounded-xl px-4 py-3 text-ink placeholder:text-ink-muted/50 focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
-                      placeholder="Your name"
+                      placeholder="اسمك"
                     />
                   </div>
 
                   {/* Phone */}
                   <div>
                     <label className="text-sm font-medium text-ink mb-1 block">
-                      Phone (Lebanon) *
+                      رقم الهاتف (لبنان) *
                     </label>
-                    <div className="flex gap-2">
+                    {/* الأرقام دائماً من اليسار لليمين حتى بالواجهة العربية */}
+                    <div dir="ltr" className="flex gap-2">
                       <div className="flex items-center gap-1.5 px-3 bg-cream border border-line rounded-xl text-sm text-ink font-medium shrink-0">
                         <span>🇱🇧</span>
                         <span>+961</span>
@@ -574,21 +575,21 @@ export default function CheckoutModal({
                   {/* Notes */}
                   <div>
                     <label className="text-sm font-medium text-ink mb-1 block">
-                      Notes (optional)
+                      ملاحظات (اختياري)
                     </label>
                     <textarea
                       value={notes}
                       onChange={(e) => setNotes(e.target.value)}
                       rows={2}
                       className="w-full bg-surface border border-line rounded-xl px-4 py-3 text-ink placeholder:text-ink-muted/50 focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 resize-none"
-                      placeholder="Any special requests..."
+                      placeholder="أي طلبات خاصة..."
                     />
                   </div>
 
                   {/* Coupon */}
                   <div>
                     <label className="text-sm font-medium text-ink mb-1.5 block">
-                      Coupon Code
+                      كود الخصم
                     </label>
 
                     {appliedOffer ? (
@@ -600,8 +601,8 @@ export default function CheckoutModal({
                           </p>
                           <p className="text-xs text-green-600">
                             {appliedOffer.discount_type === 'percentage'
-                              ? `${appliedOffer.discount_value}% off`
-                              : `${formatCurrency(appliedOffer.discount_value, restaurant.currency)} off`}
+                              ? `خصم ${appliedOffer.discount_value}%`
+                              : `خصم ${formatCurrency(appliedOffer.discount_value, restaurant.currency)}`}
                           </p>
                         </div>
                         <button
@@ -609,7 +610,7 @@ export default function CheckoutModal({
                           onClick={removeCoupon}
                           className="text-xs text-red-500 hover:underline shrink-0"
                         >
-                          Remove
+                          إزالة
                         </button>
                       </div>
                     ) : (
@@ -617,7 +618,7 @@ export default function CheckoutModal({
                         <div className="relative flex-1">
                           <Tag
                             size={16}
-                            className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-muted"
+                            className="absolute start-3 top-1/2 -translate-y-1/2 text-ink-muted"
                           />
                           <input
                             type="text"
@@ -625,8 +626,8 @@ export default function CheckoutModal({
                             onChange={(e) =>
                               setCouponCode(e.target.value.toUpperCase())
                             }
-                            placeholder="Enter code"
-                            className="w-full bg-surface border border-line rounded-xl pl-10 pr-3 py-3 font-mono text-ink placeholder:text-ink-muted/50 focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
+                            placeholder="أدخل الكود"
+                            className="w-full bg-surface border border-line rounded-xl ps-10 pe-3 py-3 font-mono text-ink placeholder:text-ink-muted/50 placeholder:font-sans focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
                           />
                         </div>
                         <button
@@ -638,7 +639,7 @@ export default function CheckoutModal({
                           {couponLoading ? (
                             <Loader2 size={16} className="animate-spin" />
                           ) : (
-                            'Apply'
+                            'تطبيق'
                           )}
                         </button>
                       </div>
@@ -655,7 +656,7 @@ export default function CheckoutModal({
                   {/* Summary */}
                   <div className="bg-cream rounded-xl p-4 space-y-2 text-sm">
                     <div className="flex justify-between">
-                      <span className="text-ink-muted">Subtotal</span>
+                      <span className="text-ink-muted">المجموع الفرعي</span>
                       <span className="text-ink">
                         {formatCurrency(sub, restaurant.currency)}
                       </span>
@@ -663,8 +664,8 @@ export default function CheckoutModal({
 
                     {discountAmount > 0 && (
                       <div className="flex justify-between text-green-600 font-medium">
-                        <span>Discount ({appliedOffer?.code})</span>
-                        <span>
+                        <span>الخصم ({appliedOffer?.code})</span>
+                        <span dir="ltr">
                           -{formatCurrency(discountAmount, restaurant.currency)}
                         </span>
                       </div>
@@ -672,7 +673,7 @@ export default function CheckoutModal({
 
                     {orderType === 'delivery' && (
                       <div className="flex justify-between">
-                        <span className="text-ink-muted">Delivery fee</span>
+                        <span className="text-ink-muted">رسوم التوصيل</span>
                         <span className="text-ink">
                           {formatCurrency(deliveryFee, restaurant.currency)}
                         </span>
@@ -680,7 +681,7 @@ export default function CheckoutModal({
                     )}
 
                     <div className="flex justify-between font-bold text-base border-t border-line pt-2">
-                      <span className="text-ink">Total</span>
+                      <span className="text-ink">الإجمالي</span>
                       <span className="text-brand">
                         {formatCurrency(total, restaurant.currency)}
                       </span>
@@ -701,10 +702,10 @@ export default function CheckoutModal({
                     {loading ? (
                       <>
                         <Loader2 size={20} className="animate-spin" />
-                        Placing order...
+                        جاري إرسال الطلب...
                       </>
                     ) : (
-                      `Place Order — ${formatCurrency(total, restaurant.currency)}`
+                      `تأكيد الطلب — ${formatCurrency(total, restaurant.currency)}`
                     )}
                   </button>
                 </form>

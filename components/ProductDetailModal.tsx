@@ -139,7 +139,7 @@ export default function ProductDetailModal({
               <button
                 onClick={onClose}
                 className="p-2.5 -m-1 hover:bg-cream rounded-full text-ink-muted shrink-0 transition-colors"
-                aria-label="Close"
+                aria-label="إغلاق"
               >
                 <X size={20} />
               </button>
@@ -157,9 +157,9 @@ export default function ProductDetailModal({
                     className="w-full h-full object-cover"
                   />
                   {product.featured && (
-                    <div className="absolute top-3 right-3 bg-brand text-white text-xs font-bold px-2.5 py-1 rounded-full shadow-lg flex items-center gap-1">
+                    <div className="absolute top-3 end-3 bg-brand text-white text-xs font-bold px-2.5 py-1 rounded-full shadow-lg flex items-center gap-1">
                       <Flame size={12} />
-                      Featured
+                      مميز
                     </div>
                   )}
                 </div>
@@ -176,7 +176,7 @@ export default function ProductDetailModal({
               {product.variants && product.variants.length > 0 && (
                 <div>
                   <h3 className="text-sm font-bold text-ink mb-3">
-                    اختار الحجم
+                    اختر الحجم
                   </h3>
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
                     {product.variants.map((v) => (
@@ -279,7 +279,7 @@ export default function ProductDetailModal({
                     onClick={() => setQty(Math.max(1, qty - 1))}
                     className="w-11 h-11 rounded-xl bg-cream hover:bg-brand/10 disabled:opacity-40 text-ink flex items-center justify-center transition-colors"
                     disabled={qty <= 1}
-                    aria-label="Decrease quantity"
+                    aria-label="إنقاص الكمية"
                   >
                     <Minus size={18} />
                   </button>
@@ -289,7 +289,7 @@ export default function ProductDetailModal({
                   <button
                     onClick={() => setQty(qty + 1)}
                     className="w-11 h-11 rounded-xl bg-brand hover:bg-brand-dark text-white flex items-center justify-center transition-colors"
-                    aria-label="Increase quantity"
+                    aria-label="زيادة الكمية"
                   >
                     <Plus size={18} />
                   </button>

@@ -11,6 +11,7 @@ import CartDrawer from '@/components/CartDrawer';
 import ProductDetailModal from '@/components/ProductDetailModal';
 import { useCart } from '@/lib/store/cart';
 import { buildThemeVars } from '@/lib/themes';
+import { itemsLabel } from '@/lib/utils/arabic';
 
 export default function MenuClient({ menu }: { menu: FullMenu }) {
   const [activeCat, setActiveCat] = useState<string>(
@@ -33,7 +34,7 @@ export default function MenuClient({ menu }: { menu: FullMenu }) {
           {
             id: '__uncat__',
             restaurant_id: menu.id,
-            name: 'Other',
+            name: 'أخرى',
             name_ar: null,
             icon: null,
             sort_order: 9999,
@@ -65,6 +66,8 @@ export default function MenuClient({ menu }: { menu: FullMenu }) {
   return (
     <MotionConfig reducedMotion="user">
       <div
+        dir="rtl"
+        lang="ar"
         className="min-h-screen pb-32 bg-cream text-ink transition-colors"
         style={themeVars}
       >
@@ -87,8 +90,7 @@ export default function MenuClient({ menu }: { menu: FullMenu }) {
               </h2>
               <div className="flex-1 h-px bg-line" />
               <span className="text-xs font-medium text-ink-muted tabular-nums">
-                {current.products.length} item
-                {current.products.length !== 1 ? 's' : ''}
+                {itemsLabel(current.products.length)}
               </span>
             </div>
           )}
@@ -107,7 +109,7 @@ export default function MenuClient({ menu }: { menu: FullMenu }) {
                   <div className="w-16 h-16 rounded-2xl bg-surface mx-auto flex items-center justify-center text-3xl shadow-soft mb-4">
                     🍽️
                   </div>
-                  <p className="font-medium text-ink-muted">No items yet</p>
+                  <p className="font-medium text-ink-muted">لا توجد أصناف بعد</p>
                 </div>
               )}
 

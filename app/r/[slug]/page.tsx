@@ -64,11 +64,11 @@ export async function generateMetadata({
     .eq('slug', slug)
     .single();
 
-  if (!data) return { title: 'Menu' };
+  if (!data) return { title: 'المنيو' };
 
   return {
-    title: `${data.name} — Menu`,
-    description: data.description ?? `Order online from ${data.name}`,
+    title: `${data.name} — المنيو`,
+    description: data.description ?? `اطلب أونلاين من ${data.name}`,
     openGraph: {
       title: data.name,
       description: data.description ?? undefined,

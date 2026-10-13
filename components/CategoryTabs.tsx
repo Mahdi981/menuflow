@@ -29,7 +29,7 @@ export default function CategoryTabs({
 
   return (
     <nav
-      aria-label="Menu categories"
+      aria-label="أقسام المنيو"
       className="sticky top-0 z-30 bg-cream/90 backdrop-blur-lg border-b border-line mt-6"
     >
       <div

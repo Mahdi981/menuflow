@@ -102,7 +102,7 @@ export default function LocationPicker({ value, onChange }: Props) {
                 })
               }
               rows={3}
-              className="w-full bg-white border border-line rounded-xl px-4 py-3 text-ink placeholder:text-ink-muted/50 focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 resize-none"
+              className="w-full bg-surface border border-line rounded-xl px-4 py-3 text-ink placeholder:text-ink-muted/50 focus:outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 resize-none"
               placeholder="الشارع، المبنى، الطابق..."
             />
           </div>

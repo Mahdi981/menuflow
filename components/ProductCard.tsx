@@ -52,7 +52,7 @@ export default function ProductCard({
         type="button"
         onClick={onOpenDetail}
         className="absolute inset-0 rounded-2xl"
-        aria-label={`View ${product.name}`}
+        aria-label={`عرض ${product.name}`}
       />
 
       {/* Image */}
@@ -73,14 +73,14 @@ export default function ProductCard({
         )}
 
         {hasDiscount && (
-          <div className="absolute top-1.5 left-1.5 bg-amber-custom text-white text-[11px] font-bold px-1.5 py-0.5 rounded-md shadow-md">
+          <div dir="ltr" className="absolute top-1.5 start-1.5 bg-amber-custom text-white text-[11px] font-bold px-1.5 py-0.5 rounded-md shadow-md">
             -{discountPercent}%
           </div>
         )}
 
         {product.featured && !hasDiscount && (
-          <div className="absolute top-1.5 left-1.5 bg-brand text-white p-1 rounded-md shadow-md">
-            <Star size={12} className="fill-current" aria-label="Featured" />
+          <div className="absolute top-1.5 start-1.5 bg-brand text-white p-1 rounded-md shadow-md">
+            <Star size={12} className="fill-current" aria-label="مميز" />
           </div>
         )}
       </div>
@@ -124,7 +124,7 @@ export default function ProductCard({
             whileTap={{ scale: 0.88 }}
             onClick={handleQuickAdd}
             className="relative z-10 w-11 h-11 rounded-xl bg-gradient-to-br from-brand to-brand-dark text-white flex items-center justify-center shadow-md hover:shadow-brand-lg transition-shadow shrink-0"
-            aria-label={`Add ${product.name} to cart`}
+            aria-label={`أضف ${product.name} إلى السلة`}
           >
             <Plus size={20} strokeWidth={2.5} />
           </motion.button>

@@ -37,7 +37,7 @@ export default function MenuHeader({ restaurant }: { restaurant: Restaurant }) {
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={restaurant.logo_url}
-              alt={`${restaurant.name} logo`}
+              alt={`شعار ${restaurant.name}`}
               className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl object-cover border-4 border-surface shadow-lg -mt-12 sm:-mt-16 shrink-0 bg-surface"
             />
           ) : (
@@ -96,7 +96,7 @@ export default function MenuHeader({ restaurant }: { restaurant: Restaurant }) {
               {todayHours && (
                 <span className="text-xs text-ink-muted flex items-center gap-1 tabular-nums">
                   <Clock size={12} />
-                  {todayHours}
+                  <span dir="ltr">{todayHours}</span>
                 </span>
               )}
             </div>

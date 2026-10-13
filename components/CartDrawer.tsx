@@ -70,12 +70,12 @@ export default function CartDrawer({
               {/* Header */}
               <div className="flex items-center justify-between p-4 border-b border-line shrink-0">
                 <h2 id="cart-title" className="text-lg font-bold text-ink">
-                  Your Order
+                  طلبك
                 </h2>
                 <button
                   onClick={onClose}
                   className="p-2.5 -m-1 hover:bg-cream rounded-full text-ink-muted transition-colors"
-                  aria-label="Close cart"
+                  aria-label="إغلاق السلة"
                 >
                   <X size={20} />
                 </button>
@@ -88,9 +88,9 @@ export default function CartDrawer({
                     <div className="w-16 h-16 rounded-2xl bg-cream mx-auto flex items-center justify-center text-3xl mb-4">
                       🛒
                     </div>
-                    <p className="text-ink-muted font-medium">Cart is empty</p>
+                    <p className="text-ink-muted font-medium">السلة فارغة</p>
                     <p className="text-sm text-ink-muted/70 mt-1">
-                      Add items from the menu
+                      أضف أصنافاً من المنيو
                     </p>
                   </div>
                 )}
@@ -145,7 +145,7 @@ export default function CartDrawer({
                       <button
                         onClick={() => removeItem(item.cart_item_id)}
                         className="p-2 -m-1 text-red-500 hover:bg-red-500/10 rounded-lg shrink-0 transition-colors"
-                        aria-label={`Remove ${item.name}`}
+                        aria-label={`حذف ${item.name}`}
                       >
                         <Trash2 size={16} />
                       </button>
@@ -207,7 +207,7 @@ export default function CartDrawer({
                             updateQty(item.cart_item_id, item.qty - 1)
                           }
                           className="w-9 h-9 rounded-full bg-surface border border-line hover:bg-brand/10 flex items-center justify-center text-ink transition-colors"
-                          aria-label="Decrease quantity"
+                          aria-label="إنقاص الكمية"
                         >
                           <Minus size={14} />
                         </button>
@@ -219,7 +219,7 @@ export default function CartDrawer({
                             updateQty(item.cart_item_id, item.qty + 1)
                           }
                           className="w-9 h-9 rounded-full bg-brand hover:bg-brand-dark text-white flex items-center justify-center transition-colors"
-                          aria-label="Increase quantity"
+                          aria-label="زيادة الكمية"
                         >
                           <Plus size={14} />
                         </button>
@@ -233,7 +233,7 @@ export default function CartDrawer({
               {items.length > 0 && (
                 <div className="border-t border-line p-4 pb-safe space-y-3 shrink-0">
                   <div className="flex justify-between text-sm">
-                    <span className="text-ink-muted">Subtotal</span>
+                    <span className="text-ink-muted">المجموع الفرعي</span>
                     <span className="font-semibold text-ink">
                       {formatCurrency(sub, restaurant.currency)}
                     </span>
@@ -241,7 +241,7 @@ export default function CartDrawer({
 
                   {sub < restaurant.min_order && (
                     <p className="text-xs text-amber-custom bg-amber-custom/5 border border-amber-custom/20 rounded-lg p-2">
-                      Minimum order:{' '}
+                      الحد الأدنى للطلب:{' '}
                       {formatCurrency(restaurant.min_order, restaurant.currency)}
                     </p>
                   )}
@@ -251,7 +251,7 @@ export default function CartDrawer({
                     onClick={() => setCheckoutOpen(true)}
                     className="w-full bg-gradient-to-r from-brand to-brand-dark hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold py-3.5 rounded-xl transition shadow-brand"
                   >
-                    Checkout
+                    متابعة الطلب
                   </button>
                 </div>
               )}

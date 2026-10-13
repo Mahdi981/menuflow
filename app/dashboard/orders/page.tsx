@@ -423,7 +423,7 @@ export default function OrdersPage() {
                   <div className="flex items-center gap-3 text-xs text-ink-muted">
                     <span>Subtotal: {formatCurrency(order.subtotal, restaurant.currency)}</span>
                     {order.delivery_fee > 0 && (
-                      <span>Delivery: ${order.delivery_fee.toFixed(2)}</span>
+                      <span>Delivery: {formatCurrency(order.delivery_fee, restaurant.currency)}</span>
                     )}
                     <span className="font-bold text-ink">
                       Total: {formatCurrency(order.total, restaurant.currency)}
